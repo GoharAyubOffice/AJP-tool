@@ -418,6 +418,125 @@ def history(
 
 
 # ============================================================================
+# Renderer Test Command (Day 2)
+# ============================================================================
+
+@app.command("render-test")
+def render_test(
+    cv_path: Path = typer.Option(
+        None,
+        "--cv",
+        "-c",
+        help="Path to Master CV JSON (defaults to test fixture)",
+    ),
+    output_dir: Path = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Output directory (defaults to current directory)",
+    ),
+    job_title: str = typer.Option(
+        "Data Entry Clerk",
+        "--job-title",
+        "-j",
+        help="Job title for filename",
+    ),
+    pdf: bool = typer.Option(
+        False,
+        "--pdf",
+        "-p",
+        help="Also generate PDF (requires LibreOffice)",
+    ),
+) -> None:
+    """
+    Test the ATS-compliant DOCX renderer.
+
+    Generates a sample CV from the Master CV or test fixture.
+    Use this to validate ATS compliance before production use.
+
+    After running, you should:
+    1. Open the DOCX in Microsoft Word to verify formatting
+    2. Upload to Jobscan to verify ATS parse success
+    """
+    from jobtool.renderer.docx_renderer import render_cv
+
+    # Determine CV source
+    if cv_path is None:
+        # Try test fixture first, then user's Master CV
+        fixture_path = Path(__file__).parent.parent / "tests" / "fixtures" / "sample-master-cv.json"
+        if fixture_path.exists():
+            cv_path = fixture_path
+            print_info(f"Using test fixture: {cv_path}")
+        else:
+            cv_path = get_master_cv_path()
+            print_info(f"Using Master CV: {cv_path}")
+
+    if not cv_path.exists():
+        print_error(f"CV file not found: {cv_path}")
+        raise typer.Exit(1)
+
+    # Load and validate CV
+    try:
+        with open(cv_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        cv = MasterCV.model_validate(data)
+    except json.JSONDecodeError as e:
+        print_error(f"Invalid JSON: {e}")
+        raise typer.Exit(1)
+    except ValidationError as e:
+        print_error(f"Schema validation failed: {e}")
+        raise typer.Exit(1)
+
+    # Determine output directory
+    if output_dir is None:
+        output_dir = Path.cwd()
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Render the CV
+    console.print(Panel.fit(
+        "[bold blue]Rendering ATS-Compliant CV[/bold blue]",
+        border_style="blue",
+    ))
+
+    try:
+        output_file = render_cv(cv, output_dir, job_title)
+        print_success(f"CV generated: {output_file}")
+    except Exception as e:
+        print_error(f"Render failed: {e}")
+        raise typer.Exit(1)
+
+    # PDF conversion if requested
+    if pdf:
+        from jobtool.renderer.pdf import docx_to_pdf, LibreOfficeNotFoundError
+
+        try:
+            pdf_file = docx_to_pdf(output_file)
+            print_success(f"PDF generated: {pdf_file}")
+        except LibreOfficeNotFoundError as e:
+            print_warning(f"PDF skipped: {e}")
+        except Exception as e:
+            print_error(f"PDF conversion failed: {e}")
+
+    # Print verification checklist
+    console.print()
+    console.print(Panel(
+        "[bold]ATS Compliance Checklist[/bold]\n\n"
+        "Open the DOCX file and verify:\n"
+        "  1. Single column layout (no tables)\n"
+        "  2. Arial font throughout (11pt body, 14pt headings, 18pt name)\n"
+        "  3. Standard section headings (Personal Statement, Work Experience, etc.)\n"
+        "  4. Contact details in body (not header/footer)\n"
+        "  5. Solid round bullets\n"
+        "  6. 2cm margins\n"
+        "  7. Ends with 'References available on request'\n\n"
+        "[bold]Then upload to Jobscan to verify parse success.[/bold]",
+        title="Next Steps",
+        border_style="yellow",
+    ))
+
+
+# ============================================================================
 # Entry Point
 # ============================================================================
 

@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from typing import Literal
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 # ============================================================================
@@ -134,9 +134,8 @@ class MasterCV(BaseModel):
     achievements: list[str] = Field(default_factory=list)
     references: str = "Available on request"
 
-    class Config:
-        # Allow extra fields like "_instructions" in the JSON
-        extra = "ignore"
+    # Allow extra fields like "_instructions" in the JSON
+    model_config = ConfigDict(extra="ignore")
 
 
 # ============================================================================

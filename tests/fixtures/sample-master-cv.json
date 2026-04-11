@@ -1,0 +1,128 @@
+{
+  "version": "2.0",
+  "lastUpdated": "2026-04-11",
+  "personalDetails": {
+    "fullName": "John Smith",
+    "city": "London",
+    "region": "Westminster, SW1",
+    "country": "United Kingdom",
+    "phone": "+44 7700 900123",
+    "email": "john.smith@example.com",
+    "linkedin": "linkedin.com/in/johnsmith",
+    "github": null,
+    "website": null
+  },
+  "rightToWork": "British Citizen with full right to work in the UK.",
+  "personalStatement": "Highly organised administrative professional with 5 years of experience in data entry, document management, and office operations. Proven track record of maintaining 99.9% accuracy in high-volume data processing environments. Seeking a challenging role where I can apply my attention to detail and efficiency to support business operations.",
+  "workExperience": [
+    {
+      "jobTitle": "Senior Data Entry Clerk",
+      "employer": "Acme Corporation",
+      "location": "London, UK",
+      "startDate": "2022-03",
+      "endDate": "Present",
+      "type": "full-time",
+      "summary": "Lead data entry specialist handling high-volume financial records.",
+      "bullets": [
+        "Process an average of 500 financial records daily with 99.9% accuracy rate.",
+        "Trained and mentored 3 junior data entry clerks, improving team efficiency by 25%.",
+        "Developed Excel macros that reduced manual data processing time by 40%.",
+        "Collaborated with IT department to implement new CRM system, migrating 50,000 customer records."
+      ],
+      "keywords": ["data entry", "Excel", "CRM", "training", "accuracy"],
+      "skillsUsed": ["Microsoft Excel", "Data Entry", "CRM Systems", "Training"],
+      "relevantFor": ["data entry", "administration", "operations"]
+    },
+    {
+      "jobTitle": "Administrative Assistant",
+      "employer": "Smith & Partners LLP",
+      "location": "Manchester, UK",
+      "startDate": "2019-06",
+      "endDate": "2022-02",
+      "type": "full-time",
+      "summary": "Provided comprehensive administrative support to a team of 12 solicitors.",
+      "bullets": [
+        "Managed calendars, scheduled appointments, and coordinated meetings for senior partners.",
+        "Processed incoming correspondence and maintained filing systems for 200+ active cases.",
+        "Handled confidential client information in compliance with GDPR and professional standards.",
+        "Reduced document retrieval time by 60% through implementation of digital filing system."
+      ],
+      "keywords": ["administration", "scheduling", "GDPR", "legal", "filing"],
+      "skillsUsed": ["Microsoft Office", "Calendar Management", "Filing Systems", "GDPR Compliance"],
+      "relevantFor": ["administration", "legal", "data entry", "customer service"]
+    }
+  ],
+  "education": [
+    {
+      "degree": "BA Business Administration",
+      "institution": "University of Manchester",
+      "location": "Manchester, UK",
+      "startDate": "2015-09",
+      "endDate": "2018-06",
+      "grade": "2:1 Honours",
+      "highlights": [
+        "Specialised in Operations Management and Information Systems.",
+        "Completed dissertation on workflow optimisation in SMEs."
+      ]
+    }
+  ],
+  "skills": {
+    "technical": [
+      "Microsoft Excel (Advanced)",
+      "Microsoft Word",
+      "Microsoft Outlook",
+      "Google Workspace",
+      "SAP",
+      "Salesforce CRM",
+      "Data Entry (80 WPM)",
+      "Database Management"
+    ],
+    "soft": [
+      "Attention to Detail",
+      "Time Management",
+      "Organisation",
+      "Communication",
+      "Problem-solving",
+      "Team Collaboration"
+    ],
+    "tools": [
+      "Microsoft Office 365",
+      "Google Workspace",
+      "Slack",
+      "Trello",
+      "Zoom"
+    ],
+    "domains": [
+      "Data Entry",
+      "Administration",
+      "Legal Support",
+      "Financial Records"
+    ]
+  },
+  "certifications": [
+    {
+      "name": "Microsoft Office Specialist (Excel)",
+      "issuer": "Microsoft",
+      "issueDate": "2021-03",
+      "expiryDate": null,
+      "credentialId": "MOS-EX-2021"
+    },
+    {
+      "name": "GDPR Practitioner Certificate",
+      "issuer": "IAPP",
+      "issueDate": "2020-08",
+      "expiryDate": "2025-08",
+      "credentialId": null
+    }
+  ],
+  "languages": [
+    { "language": "English", "proficiency": "Native" },
+    { "language": "French", "proficiency": "Conversational" }
+  ],
+  "projects": [],
+  "achievements": [
+    "Employee of the Month - Acme Corporation (March 2023)",
+    "Awarded for implementing time-saving Excel automation"
+  ],
+  "references": "Available on request"
+}
