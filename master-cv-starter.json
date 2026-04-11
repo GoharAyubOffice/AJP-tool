@@ -1,0 +1,224 @@
+{
+  "version": "2.0",
+  "lastUpdated": "2026-04-09",
+  "_instructions": "This is your Master CV. The JobAutoApply tool reads this as the source of truth for every tailored generation. Edit any field to refine. Add metrics where you can. Fields marked REPLACE_WITH are placeholders for you to fill in. The 'relevantFor' arrays on each work entry tell the AI which role types should include that experience.",
+
+  "personalDetails": {
+    "fullName": "Gohar Iqbal",
+    "city": "London",
+    "region": "Wembley, HA9",
+    "country": "United Kingdom",
+    "phone": "REPLACE_WITH_YOUR_PHONE",
+    "email": "REPLACE_WITH_YOUR_EMAIL",
+    "linkedin": "REPLACE_WITH_YOUR_LINKEDIN_URL",
+    "github": "REPLACE_WITH_YOUR_GITHUB_URL",
+    "website": "REPLACE_WITH_YOUR_WEBSITE_URL"
+  },
+
+  "rightToWork": "Eligible to work in the United Kingdom on a Graduate (Post-Study Work) visa.",
+
+  "personalStatement": "MSc-qualified Computer Science graduate and tech founder with hands-on experience building software products, managing e-commerce operations, and running a UK-registered company. Strong attention to detail, organised approach to multi-stream operations, and proven ability to deliver results across software development, data handling, and customer-facing roles. Looking for a stable role where I can contribute reliable, accurate work and continue developing professionally.",
+
+  "workExperience": [
+    {
+      "jobTitle": "Director and Founder",
+      "employer": "TOP G LABS LTD",
+      "location": "London, United Kingdom",
+      "startDate": "2024-08",
+      "endDate": "Present",
+      "type": "self-employed",
+      "summary": "Founded and operate a UK-registered technology company (company number 15918408) building software, SaaS, and e-commerce products.",
+      "bullets": [
+        "Built and launched multiple software products including ScreenshotCraft (an app store screenshot tool for game developers) and questionstrending.com (a social media content extraction platform).",
+        "Manage all company operations including Companies House filings, banking through Tide, accounting records, and HMRC compliance.",
+        "Run a Shopify e-commerce store (CleanCove Pets) including product page optimisation, cart functionality, and Meta advertising infrastructure.",
+        "Coordinate multiple parallel projects using structured planning documents (PRDs, TDDs, sprint plans) and agile delivery methods.",
+        "Developed full-stack web applications using Next.js, React, Node.js, and modern AI tools including the Claude API."
+      ],
+      "keywords": ["company director", "software development", "e-commerce", "operations management", "project management", "compliance", "accounting", "data management"],
+      "skillsUsed": ["JavaScript", "TypeScript", "Next.js", "React", "Node.js", "Shopify", "Project Management", "Operations", "Record Keeping"],
+      "relevantFor": ["software development", "web development", "operations", "e-commerce", "project management", "data entry", "administration", "business analyst"]
+    },
+    {
+      "jobTitle": "Delivery Operations (Self-Employed)",
+      "employer": "Uber Eats, Deliveroo, Just Eat",
+      "location": "London, United Kingdom",
+      "startDate": "2024-01",
+      "endDate": "Present",
+      "type": "self-employed",
+      "summary": "Operate a multi-platform food delivery service across central London and Brent zones using an electric moped.",
+      "bullets": [
+        "Manage simultaneous operations across three delivery platforms, optimising acceptance decisions in real time to maximise efficiency.",
+        "Maintain a high on-time delivery rate across hundreds of orders per month while delivering excellent customer service.",
+        "Track all earnings, fuel costs, and tax records for HMRC self-assessment using spreadsheets and accounting tools.",
+        "Built strong knowledge of London routes, traffic patterns, and time-critical customer service standards."
+      ],
+      "keywords": ["customer service", "logistics", "time management", "self-employment", "record keeping", "data entry", "attention to detail"],
+      "skillsUsed": ["Time management", "Customer service", "Record keeping", "Problem-solving", "Microsoft Excel"],
+      "relevantFor": ["customer service", "logistics", "operations", "concierge", "administration", "data entry", "general admin"]
+    },
+    {
+      "jobTitle": "Freelance Game Developer",
+      "employer": "Self-employed (Galaxy Labs and Moonland Metaverse projects)",
+      "location": "Remote",
+      "startDate": "2022-07",
+      "endDate": "2023-09",
+      "type": "freelance",
+      "summary": "Worked as a freelance game developer on mobile and metaverse projects after completing BSc and before starting MSc.",
+      "bullets": [
+        "Built and shipped Crazy Chicken, a mobile game published on the Google Play Store.",
+        "Worked with Unity, C#, and 3D asset pipelines to deliver gameplay features and bug fixes.",
+        "Collaborated remotely with designers and artists to translate concepts into playable features.",
+        "Contributed to metaverse and 3D multiplayer browser game projects."
+      ],
+      "keywords": ["game development", "Unity", "C#", "mobile development", "remote work", "freelance"],
+      "skillsUsed": ["Unity", "C#", "Game development", "Team collaboration", "Remote working"],
+      "relevantFor": ["software development", "game development", "junior developer", "graduate developer", "qa testing"]
+    }
+  ],
+
+  "education": [
+    {
+      "degree": "MSc Advanced Computer Science",
+      "institution": "University of Hertfordshire",
+      "location": "Hatfield, United Kingdom",
+      "startDate": "2023-09",
+      "endDate": "2025-09",
+      "grade": "REPLACE_WITH_YOUR_GRADE",
+      "highlights": [
+        "Studied advanced topics in software engineering, AI, and data systems.",
+        "Completed a dissertation project applying modern software development practices."
+      ]
+    },
+    {
+      "degree": "BSc Information Technology",
+      "institution": "University of Gujrat",
+      "location": "Gujrat, Pakistan",
+      "startDate": "2018-09",
+      "endDate": "2022-06",
+      "grade": "REPLACE_WITH_YOUR_GRADE",
+      "highlights": [
+        "Foundation in programming, databases, networking, and web development.",
+        "Final year project in software development."
+      ]
+    }
+  ],
+
+  "skills": {
+    "technical": [
+      "JavaScript",
+      "TypeScript",
+      "Python",
+      "React",
+      "Next.js",
+      "Node.js",
+      "HTML",
+      "CSS",
+      "Tailwind CSS",
+      "SQL",
+      "Git",
+      "Microsoft Excel",
+      "Microsoft Word",
+      "Microsoft Office",
+      "Google Workspace",
+      "Shopify",
+      "REST APIs",
+      "AI tools (Claude, GPT)",
+      "Unity",
+      "C#"
+    ],
+    "soft": [
+      "Attention to detail",
+      "Time management",
+      "Problem-solving",
+      "Self-motivation",
+      "Customer service",
+      "Written and verbal communication",
+      "Multitasking",
+      "Adaptability",
+      "Organisation",
+      "Independent working"
+    ],
+    "tools": [
+      "Notion",
+      "Slack",
+      "Trello",
+      "GitHub",
+      "VS Code",
+      "Cursor",
+      "Claude Code",
+      "Tide Banking",
+      "Stripe",
+      "Google Play Console",
+      "Meta Business Manager"
+    ],
+    "domains": [
+      "Software development",
+      "E-commerce",
+      "Data entry",
+      "Administrative operations",
+      "Game development",
+      "SaaS",
+      "Digital marketing"
+    ]
+  },
+
+  "certifications": [
+    {
+      "name": "SIA Door Supervisor Licence",
+      "issuer": "Security Industry Authority (SIA)",
+      "issueDate": "REPLACE_WITH_DATE",
+      "expiryDate": "REPLACE_WITH_DATE",
+      "credentialId": ""
+    },
+    {
+      "name": "ACT Security Awareness",
+      "issuer": "National Counter Terrorism Security Office",
+      "issueDate": "REPLACE_WITH_DATE",
+      "expiryDate": "",
+      "credentialId": ""
+    },
+    {
+      "name": "First Aid Certificate",
+      "issuer": "REPLACE_WITH_ISSUER",
+      "issueDate": "REPLACE_WITH_DATE",
+      "expiryDate": "REPLACE_WITH_DATE",
+      "credentialId": ""
+    }
+  ],
+
+  "languages": [
+    { "language": "English", "proficiency": "Fluent" },
+    { "language": "Urdu", "proficiency": "Native" },
+    { "language": "Punjabi", "proficiency": "Native" }
+  ],
+
+  "projects": [
+    {
+      "name": "ScreenshotCraft",
+      "description": "An app store screenshot creation tool for game developers, built with Next.js, Fabric.js, and the Claude API.",
+      "url": "REPLACE_WITH_URL",
+      "technologies": ["Next.js", "React", "Fabric.js", "Claude API", "Zustand"]
+    },
+    {
+      "name": "CleanCove Pets",
+      "description": "A Shopify e-commerce store selling pet grooming products, with custom cart and product page builds.",
+      "url": "REPLACE_WITH_URL",
+      "technologies": ["Shopify", "Liquid", "JavaScript", "Meta Ads"]
+    },
+    {
+      "name": "Crazy Chicken",
+      "description": "A published mobile game on the Google Play Store, built in Unity with C#.",
+      "url": "REPLACE_WITH_URL",
+      "technologies": ["Unity", "C#", "Mobile Development"]
+    }
+  ],
+
+  "achievements": [
+    "Founded and operate a UK-registered limited company (TOP G LABS LTD) as sole director and 100% shareholder.",
+    "Published mobile game on the Google Play Store.",
+    "Completed full director and share transfer process at Companies House independently."
+  ],
+
+  "references": "Available on request"
+}
