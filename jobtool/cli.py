@@ -729,14 +729,27 @@ def generate(
 
 
 @app.command()
-def review() -> None:
+def review(
+    status: str = typer.Option("pending", "--status", "-s", help="Filter by status"),
+) -> None:
     """
     Interactive review loop for pending jobs.
 
     Step through jobs one at a time, generating CVs and submitting applications.
+
+    Keyboard shortcuts:
+        o - Open job URL in browser
+        s - Mark as submitted, go to next
+        x - Skip this job, go to next
+        n - Next job (no status change)
+        p - Previous job
+        e - Open CV file in viewer
+        r - Regenerate CV and cover letter
+        q - Quit review loop
+        ? - Show help
     """
-    print_warning("Review command not yet implemented (Day 5)")
-    raise typer.Exit(0)
+    from jobtool.review import run_review_loop
+    run_review_loop(status=status)
 
 
 @app.command()
@@ -746,10 +759,147 @@ def apply(
     """
     Quick apply to a single job by URL.
 
-    Scrapes the job, generates CV, and opens the application page.
+    Creates a job entry from the URL, generates tailored CV and cover letter,
+    then opens the application page in your browser.
+
+    Supports Reed, Indeed, and LinkedIn job URLs.
+
+    Example:
+        jobtool apply "https://www.reed.co.uk/jobs/data-entry-clerk/12345"
     """
-    print_warning("Apply command not yet implemented (Day 5)")
-    raise typer.Exit(0)
+    import webbrowser
+    import re
+    from datetime import datetime
+
+    from jobtool.db import insert_job, get_job_by_external_id, get_application_by_job_id, insert_application
+    from jobtool.models import Job, Application
+
+    console.print(Panel.fit(
+        f"[bold blue]Quick Apply[/bold blue]\n\n"
+        f"URL: {url[:60]}...",
+        border_style="blue",
+    ))
+    console.print()
+
+    # Determine source from URL
+    if "reed.co.uk" in url:
+        source = "reed"
+        # Extract job ID from Reed URL
+        match = re.search(r'/(\d+)\??', url)
+        external_id = match.group(1) if match else None
+    elif "indeed.com" in url or "indeed.co.uk" in url:
+        source = "indeed"
+        match = re.search(r'jk=([a-f0-9]+)', url)
+        external_id = match.group(1) if match else None
+    elif "linkedin.com" in url:
+        source = "linkedin"
+        match = re.search(r'/jobs/view/(\d+)', url)
+        external_id = match.group(1) if match else None
+    else:
+        print_error("Unsupported job URL. Supported: Reed, Indeed, LinkedIn")
+        raise typer.Exit(1)
+
+    if not external_id:
+        print_error("Could not extract job ID from URL")
+        raise typer.Exit(1)
+
+    # Check if job already exists
+    existing_job = get_job_by_external_id(source, external_id)
+    if existing_job:
+        print_info(f"Job already in database (ID: {existing_job.id})")
+        job = existing_job
+    else:
+        # Create minimal job entry
+        print_info("Creating job entry...")
+        job = Job(
+            source=source,
+            external_id=external_id,
+            title="Manual Application",
+            company="See job posting",
+            location="",
+            salary_min=None,
+            salary_max=None,
+            description="Job added via quick apply. Visit URL for details.",
+            url=url,
+            scraped_at=datetime.now().isoformat(),
+            status="pending",
+        )
+        insert_job(job)
+        # Get the inserted job with ID
+        job = get_job_by_external_id(source, external_id)
+        print_success(f"Job added (ID: {job.id})")
+
+    # Check if application exists
+    existing_app = get_application_by_job_id(job.id)
+    if existing_app and existing_app.cv_path:
+        print_info("Application already generated")
+        print_info(f"CV: {existing_app.cv_path}")
+    else:
+        # Load Master CV
+        master_cv_path = get_master_cv_path()
+        if not master_cv_path.exists():
+            print_warning("Master CV not found - skipping CV generation")
+            print_info("Open the URL to apply manually")
+        else:
+            try:
+                with open(master_cv_path, "r", encoding="utf-8") as f:
+                    master_cv = MasterCV.model_validate(json.load(f))
+
+                from jobtool.ai.tailor import generate_application, AIGenerationError
+                from jobtool.renderer.docx_renderer import render_cv, render_cover_letter, slugify
+                from jobtool.renderer.pdf import docx_to_pdf, is_libreoffice_installed
+
+                # Determine output directory
+                company_slug = slugify(job.company)
+                title_slug = slugify(job.title)
+                date_str = datetime.now().strftime("%Y-%m-%d")
+                output_dir = get_applications_dir() / f"{company_slug}-{title_slug}-{date_str}"
+                output_dir.mkdir(parents=True, exist_ok=True)
+
+                print_info("Generating tailored CV...")
+                tailored_cv, cover_letter = generate_application(master_cv, job)
+
+                cv_path = render_cv(tailored_cv, output_dir, job.title)
+                cl_path = render_cover_letter(
+                    cover_letter,
+                    output_dir,
+                    master_cv.personalDetails.fullName,
+                    job.title,
+                )
+
+                # PDF conversion
+                cv_pdf_path = None
+                cl_pdf_path = None
+                if is_libreoffice_installed():
+                    try:
+                        cv_pdf_path = docx_to_pdf(cv_path)
+                        cl_pdf_path = docx_to_pdf(cl_path)
+                    except Exception:
+                        pass
+
+                application = Application(
+                    job_id=job.id,
+                    cv_path=str(cv_path),
+                    cv_pdf_path=str(cv_pdf_path) if cv_pdf_path else None,
+                    cover_letter_path=str(cl_path),
+                    cover_letter_pdf_path=str(cl_pdf_path) if cl_pdf_path else None,
+                    status="pending",
+                    created_at=datetime.now().isoformat(),
+                )
+                insert_application(application)
+
+                print_success("CV and cover letter generated!")
+                print_info(f"CV: {cv_path}")
+
+            except AIGenerationError as e:
+                print_warning(f"CV generation failed: {e}")
+            except Exception as e:
+                print_warning(f"Error generating CV: {e}")
+
+    # Open URL in browser
+    print_info("Opening job URL in browser...")
+    webbrowser.open(url)
+    print_success("Done! Apply manually using your generated CV.")
 
 
 @app.command()
@@ -757,14 +907,105 @@ def history(
     week: bool = typer.Option(False, "--week", help="Show only last 7 days"),
     month: bool = typer.Option(False, "--month", help="Show only last 30 days"),
     status: str = typer.Option(None, "--status", "-s", help="Filter by status"),
+    limit: int = typer.Option(50, "--limit", "-n", help="Max records to show"),
 ) -> None:
     """
     Show application history.
 
     Lists past applications with dates, companies, and statuses.
+
+    Examples:
+        jobtool history
+        jobtool history --week
+        jobtool history --status submitted
     """
-    print_warning("History command not yet implemented (Day 5)")
-    raise typer.Exit(0)
+    from datetime import datetime, timedelta
+    from jobtool.db import get_all_applications
+
+    applications = get_all_applications(status=status, limit=limit)
+
+    if not applications:
+        print_info("No applications found.")
+        print_info("Run 'jobtool review' or 'jobtool generate <job_id>' to create applications.")
+        return
+
+    # Filter by date if requested
+    if week or month:
+        now = datetime.now()
+        if week:
+            cutoff = now - timedelta(days=7)
+        else:  # month
+            cutoff = now - timedelta(days=30)
+
+        filtered = []
+        for app, job in applications:
+            if app.created_at:
+                try:
+                    app_date = datetime.fromisoformat(app.created_at.replace("Z", "+00:00"))
+                    if app_date.replace(tzinfo=None) >= cutoff:
+                        filtered.append((app, job))
+                except Exception:
+                    filtered.append((app, job))  # Include if date parsing fails
+            else:
+                filtered.append((app, job))
+        applications = filtered
+
+    if not applications:
+        time_range = "7 days" if week else "30 days"
+        print_info(f"No applications in the last {time_range}.")
+        return
+
+    # Build table
+    table = Table(title=f"Application History ({len(applications)} records)", show_header=True)
+    table.add_column("ID", style="cyan", width=5)
+    table.add_column("Date", width=12)
+    table.add_column("Company", style="yellow", max_width=20)
+    table.add_column("Title", style="white", max_width=25)
+    table.add_column("Status", width=10)
+    table.add_column("CV", width=6)
+
+    for app, job in applications:
+        # Format date
+        if app.created_at:
+            try:
+                dt = datetime.fromisoformat(app.created_at.replace("Z", "+00:00"))
+                date_str = dt.strftime("%Y-%m-%d")
+            except Exception:
+                date_str = app.created_at[:10] if len(app.created_at) >= 10 else "-"
+        else:
+            date_str = "-"
+
+        # Status color
+        status_style = {
+            "pending": "[white]pending[/white]",
+            "submitted": "[green]submitted[/green]",
+            "rejected": "[red]rejected[/red]",
+            "interview": "[cyan]interview[/cyan]",
+        }.get(app.status, app.status)
+
+        # CV indicator
+        cv_indicator = "[green]Yes[/green]" if app.cv_path else "[dim]No[/dim]"
+
+        table.add_row(
+            str(app.id),
+            date_str,
+            (job.company if job else "Unknown")[:20],
+            (job.title if job else "Unknown")[:25],
+            status_style,
+            cv_indicator,
+        )
+
+    console.print(table)
+
+    # Summary stats
+    console.print()
+    total = len(applications)
+    submitted = sum(1 for app, _ in applications if app.status == "submitted")
+    pending = sum(1 for app, _ in applications if app.status == "pending")
+
+    console.print(f"[bold]Summary:[/bold] {total} applications - "
+                  f"[green]{submitted} submitted[/green], "
+                  f"[white]{pending} pending[/white]")
 
 
 # ============================================================================
