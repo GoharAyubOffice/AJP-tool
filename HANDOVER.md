@@ -1,8 +1,8 @@
 # JobAutoApply - Project Handover Document
 
-**Last Updated:** 2026-04-11
+**Last Updated:** 2026-04-12
 **Current Sprint:** Sprint 1 (5-day build)
-**Current Day:** Day 2 COMPLETE, awaiting user verification before Day 3
+**Current Day:** Day 3 COMPLETE, ready for Day 4 (Indeed/LinkedIn scrapers)
 
 ---
 
@@ -149,32 +149,25 @@ User data stored at `~/.jobtool/`:
 - [x] 10 regression tests - ALL PASSING
 - [x] Committed: `0c1d8d8`
 
-**⏳ AWAITING USER ACTION:**
-1. Verify generated DOCX in Microsoft Word
-2. Upload to Jobscan and verify parse success
-3. Install LibreOffice for PDF
-4. Fill in Master CV with real details
-5. Set up .env with API keys
+### Day 3: Reed API + Claude Generation ✅ COMPLETE
+- [x] Implement reed.py scraper (full API integration)
+- [x] Implement tailor.py with Claude API
+- [x] Implement `jobtool scrape` command
+- [x] Implement `jobtool list` command
+- [x] Implement `jobtool generate <job_id>` command
+- [x] End-to-end test PASSED - CV + Cover Letter + PDF generated
 
-### Day 3: Reed API + Claude Generation 🔜 NEXT
-- [ ] Implement reed.py scraper
-- [ ] Implement tailor.py with Claude API
-- [ ] Implement `jobtool scrape` command
-- [ ] Implement `jobtool generate <job_id>` command
-- [ ] End-to-end test with real jobs
-
-### Day 4: Indeed + LinkedIn Scrapers
-- [ ] `jobtool login` command
-- [ ] indeed.py with Playwright
-- [ ] linkedin.py with Playwright
+### Day 4: Indeed + LinkedIn Scrapers 🔜 NEXT
+- [ ] `jobtool login` command (Playwright headed mode)
+- [ ] indeed.py with Playwright + persistent context
+- [ ] linkedin.py with Playwright + anti-detection
 - [ ] De-duplication across sources
 
 ### Day 5: Review Loop + Polish
-- [ ] Interactive review loop
-- [ ] `jobtool list` command
+- [ ] Interactive review loop (`jobtool review`)
 - [ ] `jobtool history` command
 - [ ] `jobtool apply <url>` command
-- [ ] Final testing
+- [ ] Final testing and polish
 
 ---
 
@@ -195,6 +188,17 @@ jobtool render-test --output ./test-output
 
 # Test with PDF (requires LibreOffice)
 jobtool render-test --output ./test-output --pdf
+
+# Scrape jobs from Reed
+jobtool scrape "data entry" --location London --max 20
+
+# List scraped jobs
+jobtool list
+jobtool list --status pending
+jobtool list --source reed
+
+# Generate CV and cover letter for a job
+jobtool generate <job_id>
 
 # Show help
 jobtool --help

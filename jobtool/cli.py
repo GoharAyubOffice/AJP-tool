@@ -341,41 +341,296 @@ def scrape(
     max_jobs: int = typer.Option(50, "--max", "-m", help="Max jobs per source"),
     salary_min: int = typer.Option(None, "--salary-min", help="Minimum salary filter"),
     posted: str = typer.Option(None, "--posted", help="Posted filter: today, week, month"),
+    quick: bool = typer.Option(False, "--quick", "-q", help="Quick mode (shorter descriptions)"),
 ) -> None:
     """
     Scrape jobs from specified sources.
 
     Fetches job listings matching the query and saves them to the database.
+    Currently supports: reed. Indeed and LinkedIn coming in Day 4.
+
+    Examples:
+        jobtool scrape "data entry" --location London --max 20
+        jobtool scrape "software developer" -l Manchester -m 30
     """
-    print_warning("Scrape command not yet implemented (Day 3-4)")
-    raise typer.Exit(0)
+    from jobtool.scrapers.reed import scrape_reed, ReedAPIError, ReedAPIKeyMissing
+    from jobtool.db import insert_job
+
+    source_list = [s.strip().lower() for s in sources.split(",")]
+
+    console.print(Panel.fit(
+        f"[bold blue]Scraping Jobs[/bold blue]\n"
+        f"Query: {query}\n"
+        f"Location: {location}\n"
+        f"Sources: {', '.join(source_list)}\n"
+        f"Max per source: {max_jobs}",
+        border_style="blue",
+    ))
+    console.print()
+
+    total_new = 0
+    total_duplicate = 0
+
+    for source in source_list:
+        if source == "reed":
+            try:
+                print_info("Scraping Reed...")
+
+                jobs = scrape_reed(
+                    query=query,
+                    location=location,
+                    max_jobs=max_jobs,
+                    salary_min=salary_min,
+                    fetch_full_descriptions=not quick,
+                )
+
+                print_info(f"Found {len(jobs)} jobs, saving to database...")
+
+                new_count = 0
+                dup_count = 0
+                for job in jobs:
+                    result = insert_job(job)
+                    if result:
+                        new_count += 1
+                    else:
+                        dup_count += 1
+
+                total_new += new_count
+                total_duplicate += dup_count
+
+                print_success(f"Reed: {new_count} new jobs, {dup_count} duplicates skipped")
+
+            except ReedAPIKeyMissing as e:
+                print_error(str(e))
+                raise typer.Exit(1)
+            except ReedAPIError as e:
+                print_error(f"Reed API error: {e}")
+            except Exception as e:
+                print_error(f"Reed scraper failed: {e}")
+
+        elif source in ("indeed", "linkedin"):
+            print_warning(f"{source.title()} scraper not yet implemented (Day 4)")
+
+        else:
+            print_error(f"Unknown source: {source}")
+
+    # Summary
+    console.print()
+    console.print(Panel.fit(
+        f"[bold green]Scraping Complete[/bold green]\n\n"
+        f"New jobs added: {total_new}\n"
+        f"Duplicates skipped: {total_duplicate}\n\n"
+        f"Run [bold]jobtool list[/bold] to see jobs\n"
+        f"Run [bold]jobtool generate <job_id>[/bold] to create CV",
+        border_style="green",
+    ))
 
 
 @app.command("list")
 def list_jobs(
     status: str = typer.Option(None, "--status", "-s", help="Filter by status"),
     source: str = typer.Option(None, "--source", help="Filter by source"),
+    limit: int = typer.Option(20, "--limit", "-n", help="Max jobs to show"),
 ) -> None:
     """
     List jobs in the database.
 
     Shows a table of scraped jobs with their status.
     """
-    print_warning("List command not yet implemented (Day 5)")
-    raise typer.Exit(0)
+    from jobtool.db import get_all_jobs
+
+    jobs = get_all_jobs(source=source, status=status, limit=limit)
+
+    if not jobs:
+        print_info("No jobs found. Run 'jobtool scrape' first.")
+        return
+
+    table = Table(title=f"Jobs ({len(jobs)} shown)", show_header=True)
+    table.add_column("ID", style="cyan", width=5)
+    table.add_column("Title", style="white", max_width=30)
+    table.add_column("Company", style="yellow", max_width=20)
+    table.add_column("Location", max_width=15)
+    table.add_column("Salary", justify="right", max_width=15)
+    table.add_column("Source", style="blue", width=8)
+    table.add_column("Status", width=10)
+
+    for job in jobs:
+        # Format salary
+        if job.salary_min and job.salary_max:
+            salary = f"£{job.salary_min:,}-{job.salary_max:,}"
+        elif job.salary_min:
+            salary = f"£{job.salary_min:,}+"
+        elif job.salary_max:
+            salary = f"Up to £{job.salary_max:,}"
+        else:
+            salary = "-"
+
+        # Status color
+        status_style = {
+            "pending": "[white]pending[/white]",
+            "submitted": "[green]submitted[/green]",
+            "skipped": "[dim]skipped[/dim]",
+        }.get(job.status, job.status)
+
+        table.add_row(
+            str(job.id),
+            job.title[:30],
+            job.company[:20],
+            (job.location or "-")[:15],
+            salary,
+            job.source,
+            status_style,
+        )
+
+    console.print(table)
 
 
 @app.command()
 def generate(
     job_id: int = typer.Argument(..., help="Job ID to generate CV for"),
+    output_dir: Path = typer.Option(
+        None, "--output", "-o",
+        help="Output directory (defaults to ~/.jobtool/applications/)",
+    ),
 ) -> None:
     """
     Generate tailored CV and cover letter for a job.
 
-    Uses Claude AI to create ATS-compliant documents.
+    Uses Claude AI to create ATS-compliant documents tailored
+    to the specific job description.
+
+    Example:
+        jobtool generate 42
     """
-    print_warning("Generate command not yet implemented (Day 3)")
-    raise typer.Exit(0)
+    from datetime import datetime
+
+    from jobtool.db import get_job_by_id, insert_application, get_application_by_job_id
+    from jobtool.ai.tailor import generate_application, AIGenerationError, APIKeyMissingError
+    from jobtool.renderer.docx_renderer import render_cv, render_cover_letter, slugify
+    from jobtool.renderer.pdf import docx_to_pdf, is_libreoffice_installed
+    from jobtool.models import Application
+
+    # Load job from database
+    job = get_job_by_id(job_id)
+    if not job:
+        print_error(f"Job ID {job_id} not found. Run 'jobtool list' to see available jobs.")
+        raise typer.Exit(1)
+
+    # Check if already generated
+    existing = get_application_by_job_id(job_id)
+    if existing and existing.cv_path:
+        print_warning(f"Application already exists for job {job_id}")
+        print_info(f"CV: {existing.cv_path}")
+        if existing.cover_letter_path:
+            print_info(f"Cover Letter: {existing.cover_letter_path}")
+        print_info("Use --force to regenerate (not yet implemented)")
+        return
+
+    # Load Master CV
+    master_cv_path = get_master_cv_path()
+    if not master_cv_path.exists():
+        print_error(f"Master CV not found at {master_cv_path}")
+        print_info("Run 'jobtool init' and set up your Master CV first.")
+        raise typer.Exit(1)
+
+    try:
+        with open(master_cv_path, "r", encoding="utf-8") as f:
+            master_cv = MasterCV.model_validate(json.load(f))
+    except Exception as e:
+        print_error(f"Failed to load Master CV: {e}")
+        raise typer.Exit(1)
+
+    # Determine output directory
+    if output_dir is None:
+        from jobtool.config import get_applications_dir
+        company_slug = slugify(job.company)
+        title_slug = slugify(job.title)
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        output_dir = get_applications_dir() / f"{company_slug}-{title_slug}-{date_str}"
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    console.print(Panel.fit(
+        f"[bold blue]Generating Application[/bold blue]\n\n"
+        f"Job: {job.title}\n"
+        f"Company: {job.company}\n"
+        f"Location: {job.location or 'Not specified'}",
+        border_style="blue",
+    ))
+    console.print()
+
+    try:
+        # Generate CV and cover letter
+        print_info("Generating tailored CV with Claude...")
+        tailored_cv, cover_letter = generate_application(master_cv, job)
+
+        # Render CV
+        print_info("Rendering CV to DOCX...")
+        cv_path = render_cv(tailored_cv, output_dir, job.title)
+
+        # Render cover letter
+        print_info("Rendering cover letter...")
+        cl_path = render_cover_letter(
+            cover_letter,
+            output_dir,
+            master_cv.personalDetails.fullName,
+            job.title,
+        )
+
+        # Convert to PDF if LibreOffice available
+        cv_pdf_path = None
+        cl_pdf_path = None
+
+        if is_libreoffice_installed():
+            print_info("Converting to PDF...")
+            try:
+                cv_pdf_path = docx_to_pdf(cv_path)
+                cl_pdf_path = docx_to_pdf(cl_path)
+            except Exception as e:
+                print_warning(f"PDF conversion failed: {e}")
+
+        print_info("Saving to database...")
+
+        # Save application record
+        application = Application(
+            job_id=job_id,
+            cv_path=str(cv_path),
+            cv_pdf_path=str(cv_pdf_path) if cv_pdf_path else None,
+            cover_letter_path=str(cl_path),
+            cover_letter_pdf_path=str(cl_pdf_path) if cl_pdf_path else None,
+            status="pending",
+            created_at=datetime.now().isoformat(),
+        )
+        insert_application(application)
+
+        # Success output
+        console.print()
+        print_success("Application generated!")
+        console.print()
+
+        console.print(Panel(
+            f"[bold]CV:[/bold] {cv_path}\n"
+            + (f"[bold]CV (PDF):[/bold] {cv_pdf_path}\n" if cv_pdf_path else "")
+            + f"[bold]Cover Letter:[/bold] {cl_path}\n"
+            + (f"[bold]Cover Letter (PDF):[/bold] {cl_pdf_path}\n" if cl_pdf_path else "")
+            + f"\n[bold]Job URL:[/bold] {job.url}",
+            title="Generated Files",
+            border_style="green",
+        ))
+
+        console.print()
+        print_info("Open the CV and cover letter to review before applying.")
+        print_info(f"Job URL: {job.url}")
+
+    except APIKeyMissingError as e:
+        print_error(str(e))
+        raise typer.Exit(1)
+    except AIGenerationError as e:
+        print_error(f"AI generation failed: {e}")
+        raise typer.Exit(1)
+    except Exception as e:
+        print_error(f"Generation failed: {e}")
+        raise typer.Exit(1)
 
 
 @app.command()

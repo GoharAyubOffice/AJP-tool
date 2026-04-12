@@ -93,8 +93,8 @@ class Skills(BaseModel):
 class Certification(BaseModel):
     """A professional certification."""
     name: str
-    issuer: str
-    issueDate: str
+    issuer: str = ""  # Default empty to handle incomplete entries
+    issueDate: str = ""  # Default empty to handle incomplete entries
     expiryDate: str | None = None
     credentialId: str | None = None
 
