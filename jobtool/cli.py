@@ -323,14 +323,39 @@ def login(
 
     Opens a browser window for manual login. Session is saved
     for future scraping.
+
+    Examples:
+        jobtool login indeed
+        jobtool login linkedin
     """
     if source not in ("indeed", "linkedin"):
         print_error(f"Unknown source: {source}")
         print_info("Valid sources: indeed, linkedin")
         raise typer.Exit(1)
 
-    print_warning("Login command not yet implemented (Day 4)")
-    raise typer.Exit(0)
+    console.print(Panel.fit(
+        f"[bold blue]Login to {source.title()}[/bold blue]\n\n"
+        "A browser window will open.\n"
+        "Log in manually, then close the browser.",
+        border_style="blue",
+    ))
+
+    try:
+        if source == "indeed":
+            from jobtool.scrapers.indeed import login_indeed
+            login_indeed()
+        elif source == "linkedin":
+            from jobtool.scrapers.linkedin import login_linkedin
+            login_linkedin()
+
+        print_success(f"Session saved for {source.title()}")
+        print_info(f"You can now run: jobtool scrape 'query' --sources {source}")
+
+    except KeyboardInterrupt:
+        print_info("Login cancelled")
+    except Exception as e:
+        print_error(f"Login failed: {e}")
+        raise typer.Exit(1)
 
 
 @app.command()
@@ -408,8 +433,78 @@ def scrape(
             except Exception as e:
                 print_error(f"Reed scraper failed: {e}")
 
-        elif source in ("indeed", "linkedin"):
-            print_warning(f"{source.title()} scraper not yet implemented (Day 4)")
+        elif source == "indeed":
+            try:
+                from jobtool.scrapers.indeed import scrape_indeed, IndeedLoginRequired
+
+                print_info("Scraping Indeed...")
+
+                jobs = scrape_indeed(
+                    query=query,
+                    location=location,
+                    max_jobs=max_jobs,
+                    fetch_descriptions=not quick,
+                )
+
+                print_info(f"Found {len(jobs)} jobs, saving to database...")
+
+                new_count = 0
+                dup_count = 0
+                for job in jobs:
+                    result = insert_job(job)
+                    if result:
+                        new_count += 1
+                    else:
+                        dup_count += 1
+
+                total_new += new_count
+                total_duplicate += dup_count
+
+                print_success(f"Indeed: {new_count} new jobs, {dup_count} duplicates skipped")
+
+            except IndeedLoginRequired:
+                print_warning("Indeed requires login. Run: jobtool login indeed")
+            except Exception as e:
+                print_error(f"Indeed scraper failed: {e}")
+
+        elif source == "linkedin":
+            try:
+                from jobtool.scrapers.linkedin import scrape_linkedin, LinkedInLoginRequired
+
+                print_info("Scraping LinkedIn (this may take a while)...")
+
+                # LinkedIn has lower limits
+                linkedin_max = min(max_jobs, 25)
+                if max_jobs > 25:
+                    print_warning(f"LinkedIn limited to {linkedin_max} jobs for safety")
+
+                jobs = scrape_linkedin(
+                    query=query,
+                    location=location,
+                    max_jobs=linkedin_max,
+                    fetch_descriptions=not quick,
+                )
+
+                print_info(f"Found {len(jobs)} jobs, saving to database...")
+
+                new_count = 0
+                dup_count = 0
+                for job in jobs:
+                    result = insert_job(job)
+                    if result:
+                        new_count += 1
+                    else:
+                        dup_count += 1
+
+                total_new += new_count
+                total_duplicate += dup_count
+
+                print_success(f"LinkedIn: {new_count} new jobs, {dup_count} duplicates skipped")
+
+            except LinkedInLoginRequired:
+                print_warning("LinkedIn requires login. Run: jobtool login linkedin")
+            except Exception as e:
+                print_error(f"LinkedIn scraper failed: {e}")
 
         else:
             print_error(f"Unknown source: {source}")

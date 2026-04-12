@@ -157,13 +157,16 @@ User data stored at `~/.jobtool/`:
 - [x] Implement `jobtool generate <job_id>` command
 - [x] End-to-end test PASSED - CV + Cover Letter + PDF generated
 
-### Day 4: Indeed + LinkedIn Scrapers 🔜 NEXT
-- [ ] `jobtool login` command (Playwright headed mode)
-- [ ] indeed.py with Playwright + persistent context
-- [ ] linkedin.py with Playwright + anti-detection
-- [ ] De-duplication across sources
+### Day 4: Indeed + LinkedIn Scrapers ✅ COMPLETE
+- [x] `jobtool login indeed` command
+- [x] `jobtool login linkedin` command
+- [x] indeed.py with Playwright + persistent context + anti-detection
+- [x] linkedin.py with Playwright + stronger anti-detection
+- [x] Multi-source scraping support
+- [x] De-duplication via database
+- [x] 19 unit tests - ALL PASSING
 
-### Day 5: Review Loop + Polish
+### Day 5: Review Loop + Polish 🔜 NEXT
 - [ ] Interactive review loop (`jobtool review`)
 - [ ] `jobtool history` command
 - [ ] `jobtool apply <url>` command
@@ -189,8 +192,13 @@ jobtool render-test --output ./test-output
 # Test with PDF (requires LibreOffice)
 jobtool render-test --output ./test-output --pdf
 
-# Scrape jobs from Reed
+# Login to job boards (required for Indeed/LinkedIn)
+jobtool login indeed
+jobtool login linkedin
+
+# Scrape jobs from sources
 jobtool scrape "data entry" --location London --max 20
+jobtool scrape "developer" --sources reed,indeed,linkedin --max 30
 
 # List scraped jobs
 jobtool list

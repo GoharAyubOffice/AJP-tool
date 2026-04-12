@@ -244,11 +244,41 @@ jobtool generate 4
 
 ---
 
-### Day 4 - Indeed + LinkedIn Scrapers (NEXT)
+### Day 4 - Indeed + LinkedIn Scrapers (COMPLETE)
+**Date:** 2026-04-12
+
+**Completed:**
+- [x] Implemented `jobtool login indeed` command
+- [x] Implemented `jobtool login linkedin` command
+- [x] Implemented jobtool/scrapers/indeed.py with Playwright
+  - Persistent browser context
+  - Randomised delays (3-8s)
+  - Human-like scrolling
+  - Job card extraction
+  - Full description fetching
+- [x] Implemented jobtool/scrapers/linkedin.py with Playwright
+  - Stronger anti-detection (5-12s delays)
+  - Mouse movement simulation
+  - Viewport jitter
+  - Lower volume limits (25 jobs default)
+- [x] Updated scrape command for multi-source support
+- [x] Added de-duplication (via database INSERT OR IGNORE)
+- [x] Added 9 new unit tests (19 total, all passing)
+
+**Commands Working:**
+```bash
+jobtool login indeed      # Opens browser for Indeed login
+jobtool login linkedin    # Opens browser for LinkedIn login
+jobtool scrape "query" --sources reed,indeed,linkedin
+```
+
+---
+
+### Day 5 - Review Loop + Polish (NEXT)
 
 **TODO:**
-- [ ] Implement `jobtool login` command for Playwright
-- [ ] Implement jobtool/scrapers/indeed.py with Playwright
-- [ ] Implement jobtool/scrapers/linkedin.py with Playwright
-- [ ] Add de-duplication across sources
-- [ ] Test with real Indeed/LinkedIn searches
+- [ ] Implement `jobtool review` - Interactive review loop
+- [ ] Implement `jobtool history` - Show past applications
+- [ ] Implement `jobtool apply <url>` - Quick single-job apply
+- [ ] Final testing and polish
+- [ ] Update documentation
