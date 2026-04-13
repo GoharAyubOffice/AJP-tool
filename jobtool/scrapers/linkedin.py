@@ -1,26 +1,29 @@
 """
 LinkedIn Playwright Scraper
 
-Uses Playwright with a persistent browser context to scrape LinkedIn job listings.
-Requires manual login first via `jobtool login linkedin`.
+Uses Playwright with multiple methods to scrape LinkedIn job listings.
+Supports manual login via browser or connecting to existing Chrome session.
 
-IMPORTANT: LinkedIn has VERY aggressive anti-bot measures. This scraper uses:
+Anti-detection methods:
+- Enhanced stealth scripts to hide automation signals
 - Firefox browser (less detected than Chromium)
-- Stealth mode to hide automation signals
-- Longer randomised delays (8-15 seconds)
-- Human-like mouse movements and scrolling
-- Viewport jitter and locale spoofing
-- Lower volume limits (max 25 per session)
+- Critical Chrome args to block automation detection
+- Option to connect to existing Chrome via remote debugging (bypasses all detection)
 
-For best results: Run `jobtool login linkedin` once to save your session.
+Login options (in order of effectiveness):
+1. Connect to existing Chrome where you're already logged in
+2. Use Firefox with stealth mode
+3. Use Chromium with maximum stealth args
 """
 
 import asyncio
+import json
+import os
 import random
 import re
 from datetime import datetime
 from pathlib import Path
-from urllib.parse import urlencode, quote
+from urllib.parse import urlencode
 
 from playwright.async_api import async_playwright, Page, BrowserContext
 
@@ -44,11 +47,39 @@ class LinkedInLoginRequired(Exception):
 LINKEDIN_BASE_URL = "https://www.linkedin.com"
 LINKEDIN_JOBS_URL = f"{LINKEDIN_BASE_URL}/jobs/search"
 
-# Realistic user agents (rotating to avoid fingerprinting)
+# Realistic user agents
 USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0",
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+]
+
+# Critical Chrome args to hide automation
+CHROME_AUTOMATION_ARGS = [
+    "--disable-blink-features=AutomationControlled",
+    "--disable-automation",
+    "--no-first-run",
+    "--no-service-autorun",
+    "--password-store=basic",
+    "--disable-default-apps",
+    "--disable-extensions",
+    "--disable-background-networking",
+    "--disable-sync",
+    "--disable-translate",
+    "--metrics-recording-only",
+    "--mute-audio",
+    "--no-default-browser-check",
+    "--no-pings",
+    "--single-process",
+    "--disable-gpu",
+    "--no-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-setuid-sandbox",
+    "--window-position=0,0",
+    "--ignore-certificate-errors",
+    "--ignore-certificate-errors-spki-list",
+    "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
 ]
 
 
@@ -57,15 +88,15 @@ def get_linkedin_context_path() -> Path:
     return get_browser_contexts_dir() / "linkedin"
 
 
-async def _random_delay(min_seconds: float = 8.0, max_seconds: float = 15.0) -> None:
-    """Wait a random amount of time - longer for LinkedIn."""
+async def _random_delay(min_seconds: float = 5.0, max_seconds: float = 12.0) -> None:
+    """Wait a random amount of time."""
     delay = random.uniform(min_seconds, max_seconds)
     await asyncio.sleep(delay)
 
 
 async def _human_mouse_move(page: Page) -> None:
-    """Simulate human-like mouse movements with bezier curves."""
-    for _ in range(random.randint(3, 6)):
+    """Simulate human-like mouse movements."""
+    for _ in range(random.randint(2, 4)):
         x = random.randint(100, 1200)
         y = random.randint(100, 700)
         await page.mouse.move(x, y)
@@ -73,37 +104,68 @@ async def _human_mouse_move(page: Page) -> None:
 
 
 async def _human_scroll(page: Page) -> None:
-    """Simulate human-like scrolling with pauses and occasional back-scroll."""
-    for _ in range(random.randint(3, 6)):
-        scroll_amount = random.randint(200, 500)
+    """Simulate human-like scrolling with pauses."""
+    for _ in range(random.randint(2, 4)):
+        scroll_amount = random.randint(150, 400)
         await page.evaluate(f"window.scrollBy(0, {scroll_amount})")
-        await asyncio.sleep(random.uniform(1.0, 2.0))
+        await asyncio.sleep(random.uniform(0.5, 1.5))
 
-        if random.random() < 0.25:
-            up_amount = random.randint(50, 150)
+        if random.random() < 0.2:
+            up_amount = random.randint(50, 100)
             await page.evaluate(f"window.scrollBy(0, -{up_amount})")
-            await asyncio.sleep(random.uniform(0.5, 1.0))
+            await asyncio.sleep(random.uniform(0.3, 0.6))
 
 
 async def _add_stealth_scripts(page: Page) -> None:
-    """Add stealth scripts to hide automation signals."""
+    """Add comprehensive stealth scripts to hide automation signals."""
     await page.add_init_script("""
+        // Remove webdriver property
         Object.defineProperty(navigator, 'webdriver', {
             get: () => undefined,
             configurable: true
         });
+        
+        // Remove automation-specific properties
         delete window.cdc_adoQpoasnfa76pfcZLmcfl_Array;
         delete window.cdc_adoQpoasnfa76pfcZLmcfl_Promise;
         delete window.cdc_adoQpoasnfa76pfcZLmcfl_Symbol;
-        if (window.chrome) {
-            window.chrome.runtime = undefined;
-        }
+        
+        // Spoof chrome object
+        if (!window.chrome) window.chrome = {};
+        if (!window.chrome.runtime) window.chrome.runtime = {};
+        
+        // Override permissions query
         const originalQuery = window.navigator.permissions.query;
         window.navigator.permissions.query = (parameters) => (
             parameters.name === 'notifications' ?
                 Promise.resolve({ state: Notification.permission }) :
                 originalQuery(parameters)
         );
+
+        // Spoof plugins (real Chrome has plugins)
+        Object.defineProperty(navigator, 'plugins', {
+            get: () => [
+                { name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer' },
+                { name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai' },
+                { name: 'Native Client', filename: 'internal-nacl-plugin' }
+            ],
+            configurable: true
+        });
+
+        // Spoof languages
+        Object.defineProperty(navigator, 'languages', {
+            get: () => ['en-GB', 'en-US', 'en'],
+            configurable: true
+        });
+
+        // Remove automation-related event listeners
+        const originalAddEventListener = window.addEventListener;
+        window.addEventListener = function(type, listener, options) {
+            if (type === 'beforeinput' && listener.toString().includes('automated')) {
+                return;
+            }
+            return originalAddEventListener.call(this, type, listener, options);
+        };
     """)
 
 
@@ -117,7 +179,7 @@ def _build_search_url(
         "keywords": query,
         "location": location,
         "start": start,
-        "f_TPR": "r2592000",  # Posted in last 30 days
+        "f_TPR": "r2592000",
     }
     return LINKEDIN_JOBS_URL + "?" + urlencode(params)
 
@@ -200,7 +262,7 @@ async def _get_job_description(page: Page, job_url: str) -> str:
     try:
         await _human_mouse_move(page)
         await page.goto(job_url, wait_until="domcontentloaded")
-        await _random_delay(5, 10)
+        await _random_delay(3, 6)
         await _human_scroll(page)
 
         for selector in [
@@ -211,7 +273,7 @@ async def _get_job_description(page: Page, job_url: str) -> str:
                 show_more = await page.query_selector(selector)
                 if show_more:
                     await show_more.click()
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(0.5)
             except Exception:
                 pass
 
@@ -237,6 +299,52 @@ async def _get_job_description(page: Page, job_url: str) -> str:
         return ""
 
 
+async def _connect_to_existing_chrome() -> tuple | None:
+    """
+    Try to connect to an existing Chrome browser running with remote debugging.
+
+    To use this:
+    1. Close all Chrome windows
+    2. Open Run dialog (Win+R)
+    3. Paste this path with your Chrome path:
+       "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --profile-directory=Default
+    4. Log into LinkedIn in that Chrome window
+    5. Run jobtool with --connect-existing flag
+
+    Returns:
+        Tuple of (context, page) if successful, None if failed
+    """
+    try:
+        async with async_playwright() as p:
+            # Try to connect to Chrome via CDP
+            browser = await p.chromium.connect_over_cdp("http://localhost:9222")
+
+            # Get existing contexts
+            contexts = browser.contexts
+            if contexts:
+                context = contexts[0]
+            else:
+                context = await browser.new_context()
+
+            page = await context.new_page()
+
+            # Test connection
+            await page.goto(f"{LINKEDIN_BASE_URL}/feed", timeout=10000)
+            await _random_delay(2, 4)
+
+            if "login" not in page.url.lower():
+                print("[SUCCESS] Connected to existing Chrome session!")
+                return (context, page)
+            else:
+                print("[WARN] Chrome is not logged into LinkedIn")
+                await browser.close()
+                return None
+
+    except Exception as e:
+        print(f"[WARN] Could not connect to existing Chrome: {e}")
+        return None
+
+
 async def scrape_linkedin_async(
     query: str,
     location: str = "London",
@@ -246,15 +354,12 @@ async def scrape_linkedin_async(
     """
     Scrape jobs from LinkedIn using Playwright.
 
-    LinkedIn has VERY aggressive anti-bot detection. For best results:
-    1. Run `jobtool login linkedin` first to save your session
-    2. Firefox browser is used as it's less detected than Chromium
-    3. Results without login may be very limited (0-5 jobs)
+    For best results, run `jobtool login linkedin` first.
 
     Args:
         query: Search keywords
         location: Job location
-        max_jobs: Maximum jobs to return (recommended: 25)
+        max_jobs: Maximum jobs to return
         fetch_descriptions: Whether to fetch full descriptions
 
     Returns:
@@ -270,9 +375,13 @@ async def scrape_linkedin_async(
         viewport_width = random.randint(1200, 1920)
         viewport_height = random.randint(800, 1080)
 
+        context = None
+        page = None
+
         if use_existing_context:
             print("[INFO] Using saved LinkedIn session...")
             try:
+                # Try Firefox first (less detected)
                 context = await p.firefox.launch_persistent_context(
                     str(context_path),
                     headless=True,
@@ -280,18 +389,20 @@ async def scrape_linkedin_async(
                     viewport={"width": viewport_width, "height": viewport_height},
                 )
             except Exception:
-                print("[INFO] Firefox context not available, trying Chromium...")
-                context = await p.chromium.launch_persistent_context(
-                    str(context_path),
-                    headless=True,
-                    user_agent=user_agent,
-                    viewport={"width": viewport_width, "height": viewport_height},
-                    args=["--disable-blink-features=AutomationControlled"],
-                )
+                # Fall back to Chromium with stealth args
+                try:
+                    context = await p.chromium.launch_persistent_context(
+                        str(context_path),
+                        headless=True,
+                        user_agent=user_agent,
+                        viewport={"width": viewport_width, "height": viewport_height},
+                        args=CHROME_AUTOMATION_ARGS,
+                    )
+                except Exception as e:
+                    print(f"[WARN] Could not use saved context: {e}")
+                    context = None
         else:
-            print("[INFO] No saved LinkedIn session found.")
-            print("[INFO] LinkedIn without login has very limited results.")
-            print("[INFO] Run 'jobtool login linkedin' for full access.")
+            print("[INFO] No saved LinkedIn session. Trying Firefox...")
 
             try:
                 browser = await p.firefox.launch(
@@ -308,41 +419,50 @@ async def scrape_linkedin_async(
                 )
             except Exception as e:
                 print(f"[WARN] Firefox failed: {e}")
-                context = await p.chromium.launch(
-                    headless=True,
-                    user_agent=user_agent,
-                )
-                context = await context.new_context(
-                    user_agent=user_agent,
-                    viewport={"width": viewport_width, "height": viewport_height},
-                    locale="en-GB",
-                )
+                try:
+                    context = await p.chromium.launch(
+                        headless=True,
+                        user_agent=user_agent,
+                    )
+                    context = await context.new_context(
+                        user_agent=user_agent,
+                        viewport={"width": viewport_width, "height": viewport_height},
+                        locale="en-GB",
+                        args=CHROME_AUTOMATION_ARGS,
+                    )
+                except Exception as e2:
+                    print(f"[WARN] Chromium failed: {e2}")
+                    context = None
+
+        if context is None:
+            print("[ERROR] Could not create browser context")
+            return []
 
         page = await context.new_page()
         await _add_stealth_scripts(page)
 
         try:
             await page.goto(f"{LINKEDIN_BASE_URL}/feed", wait_until="domcontentloaded")
-            await _random_delay(3, 5)
+            await _random_delay(2, 4)
 
             if "login" in page.url.lower():
                 print("[WARN] Not logged in to LinkedIn. Results will be limited.")
+                print("[INFO] Run 'jobtool login linkedin' for full access.")
 
             start = 0
             while len(jobs) < max_jobs:
                 await _human_mouse_move(page)
                 url = _build_search_url(query, location, start)
                 await page.goto(url, wait_until="domcontentloaded")
-                await _random_delay(5, 10)
+                await _random_delay(3, 7)
                 await _human_scroll(page)
 
                 try:
                     await page.wait_for_selector(
                         ".jobs-search-results__list-item, .job-card-container, .base-search-card",
-                        timeout=15000,
+                        timeout=10000,
                     )
                 except Exception:
-                    print("[WARN] No job cards found on page.")
                     break
 
                 cards = await page.query_selector_all(
@@ -350,7 +470,6 @@ async def scrape_linkedin_async(
                 )
 
                 if not cards:
-                    print("[WARN] Empty page received.")
                     break
 
                 for card in cards:
@@ -366,13 +485,13 @@ async def scrape_linkedin_async(
                 if len(cards) < 25:
                     break
 
-                await _random_delay(10, 20)
+                await _random_delay(6, 12)
 
             if fetch_descriptions and jobs:
                 print(f"[INFO] Fetching descriptions for {len(jobs)} jobs...")
                 for i, job in enumerate(jobs):
                     if i > 0:
-                        await _random_delay(5, 10)
+                        await _random_delay(3, 6)
                     description = await _get_job_description(page, job.url)
                     job.description = description
 
@@ -390,9 +509,7 @@ def scrape_linkedin(
     max_jobs: int = 25,
     fetch_descriptions: bool = True,
 ) -> list[Job]:
-    """
-    Synchronous wrapper for LinkedIn scraper.
-    """
+    """Synchronous wrapper for LinkedIn scraper."""
     return asyncio.run(
         scrape_linkedin_async(
             query=query,
@@ -403,49 +520,86 @@ def scrape_linkedin(
     )
 
 
-async def login_linkedin_async() -> None:
+async def login_linkedin_async(use_existing: bool = False) -> None:
     """
     Open LinkedIn in a browser for manual login.
 
-    The user logs in manually, and the session is saved
-    to a persistent browser context for future scraping.
+    The session is saved to a persistent browser context for future scraping.
 
-    NOTE: LinkedIn has VERY aggressive anti-bot detection.
-    Login may be blocked. If it fails, results will be limited.
+    Args:
+        use_existing: If True, try to connect to existing Chrome with remote debugging
+                      instead of launching a new browser
     """
     context_path = get_linkedin_context_path()
     context_path.mkdir(parents=True, exist_ok=True)
 
     async with async_playwright() as p:
-        # Use Firefox for login (less detected)
-        try:
-            context = await p.firefox.launch_persistent_context(
-                str(context_path),
-                headless=False,
-                user_agent=random.choice(USER_AGENTS),
-                viewport={"width": 1280, "height": 800},
-            )
-        except Exception:
-            # Fall back to Chromium
-            context = await p.chromium.launch_persistent_context(
-                str(context_path),
-                headless=False,
-                user_agent=random.choice(USER_AGENTS),
-                viewport={"width": 1280, "height": 800},
-            )
+        context = None
+        page = None
 
-        page = await context.new_page()
-        await page.goto(f"{LINKEDIN_BASE_URL}/login")
+        if use_existing:
+            # Try to connect to existing Chrome
+            print("[INFO] Trying to connect to existing Chrome...")
+            result = await _connect_to_existing_chrome()
+            if result:
+                context, page = result
+            else:
+                print("[INFO] Could not connect to existing Chrome.")
+                print("[INFO] Falling back to automated browser...")
+
+        if context is None:
+            # Launch Firefox for login (less detected)
+            print("[INFO] Launching Firefox browser for login...")
+            try:
+                context = await p.firefox.launch_persistent_context(
+                    str(context_path),
+                    headless=False,
+                    user_agent=random.choice(USER_AGENTS),
+                    viewport={"width": 1280, "height": 800},
+                    firefox_user_prefs={
+                        "media.navigator.streams.fake": True,
+                        "media.navigator.enabled": True,
+                        "browser.private.browsing.autostart": False,
+                    },
+                )
+            except Exception as e:
+                print(f"[WARN] Firefox failed: {e}")
+                print("[INFO] Trying Chromium...")
+                # Fall back to Chromium with stealth args
+                try:
+                    context = await p.chromium.launch_persistent_context(
+                        str(context_path),
+                        headless=False,
+                        user_agent=random.choice(USER_AGENTS),
+                        viewport={"width": 1280, "height": 800},
+                        args=CHROME_AUTOMATION_ARGS,
+                    )
+                except Exception as e2:
+                    print(f"[ERROR] Chromium also failed: {e2}")
+                    print(
+                        "[ERROR] Please try running Chrome manually with remote debugging."
+                    )
+                    return
+
+            page = await context.new_page()
+            await _add_stealth_scripts(page)
+            await page.goto(f"{LINKEDIN_BASE_URL}/login")
 
         print("\n" + "=" * 60)
         print("LinkedIn Login")
         print("=" * 60)
         print("\nA browser window has opened.")
         print("Please log in to your LinkedIn account.")
-        print("\nIf login is blocked:")
-        print("  1. Open Chrome/Brave directly")
-        print("  2. Log in at https://www.linkedin.com")
-        print("  3. Export cookies to ~/.jobtool/browser-contexts/linkedin/")
+        print("\nIf login shows 'Browser not secure':")
+        print("  1. Press Ctrl+C to cancel")
+        print("  2. Open Run dialog (Win+R)")
+        print("  3. Paste this command:")
+        print(
+            '     "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" --remote-debugging-port=9222 --profile-directory=Default'
+        )
+        print("  4. Press Enter - Chrome will open")
+        print("  5. Log into LinkedIn manually in that Chrome")
+        print("  6. Then run: jobtool login linkedin --connect-existing")
         print("\nClose the browser window when done.")
         print("=" * 60 + "\n")
 
@@ -454,9 +608,17 @@ async def login_linkedin_async() -> None:
         except Exception:
             pass
 
+        # Save session
+        try:
+            storage = await context.storage_state()
+            (context_path / "storage_state.json").write_text(json.dumps(storage))
+            print("[INFO] Session saved!")
+        except Exception as e:
+            print(f"[WARN] Could not save session: {e}")
+
         await context.close()
 
 
-def login_linkedin() -> None:
+def login_linkedin(use_existing: bool = False) -> None:
     """Synchronous wrapper for LinkedIn login."""
-    asyncio.run(login_linkedin_async())
+    asyncio.run(login_linkedin_async(use_existing=use_existing))

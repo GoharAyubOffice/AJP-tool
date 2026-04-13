@@ -63,6 +63,7 @@ def print_info(message: str) -> None:
 # Version Callback
 # ============================================================================
 
+
 def version_callback(value: bool) -> None:
     if value:
         console.print(f"jobtool version {__version__}")
@@ -88,6 +89,7 @@ def main(
 # Init Command
 # ============================================================================
 
+
 @app.command()
 def init() -> None:
     """
@@ -96,10 +98,12 @@ def init() -> None:
     Creates ~/.jobtool/ with subdirectories for applications,
     browser-contexts, and logs. Safe to re-run.
     """
-    console.print(Panel.fit(
-        "[bold blue]JobAutoApply[/bold blue] - Initialising...",
-        border_style="blue",
-    ))
+    console.print(
+        Panel.fit(
+            "[bold blue]JobAutoApply[/bold blue] - Initialising...",
+            border_style="blue",
+        )
+    )
 
     created_dirs = []
     existing_dirs = []
@@ -134,25 +138,30 @@ def init() -> None:
     if not master_cv_path.exists():
         console.print()
         print_warning(f"Master CV not found at {master_cv_path}")
-        print_info("Copy master-cv-starter.json to that location and edit with your details.")
+        print_info(
+            "Copy master-cv-starter.json to that location and edit with your details."
+        )
         print_info("Then run: jobtool master-cv validate")
     else:
         print_success(f"Master CV found at {master_cv_path}")
 
     console.print()
-    console.print(Panel.fit(
-        "[green]Initialisation complete![/green]\n\n"
-        "Next steps:\n"
-        "1. Copy your .env file with API keys\n"
-        "2. Set up your Master CV at ~/.jobtool/master-cv.json\n"
-        "3. Run: jobtool master-cv validate",
-        border_style="green",
-    ))
+    console.print(
+        Panel.fit(
+            "[green]Initialisation complete![/green]\n\n"
+            "Next steps:\n"
+            "1. Copy your .env file with API keys\n"
+            "2. Set up your Master CV at ~/.jobtool/master-cv.json\n"
+            "3. Run: jobtool master-cv validate",
+            border_style="green",
+        )
+    )
 
 
 # ============================================================================
 # Master CV Commands
 # ============================================================================
+
 
 @master_cv_app.command("validate")
 def master_cv_validate(
@@ -171,10 +180,12 @@ def master_cv_validate(
     """
     cv_path = path or get_master_cv_path()
 
-    console.print(Panel.fit(
-        f"[bold blue]Validating Master CV[/bold blue]\n{cv_path}",
-        border_style="blue",
-    ))
+    console.print(
+        Panel.fit(
+            f"[bold blue]Validating Master CV[/bold blue]\n{cv_path}",
+            border_style="blue",
+        )
+    )
     console.print()
 
     # Check file exists
@@ -314,9 +325,15 @@ def master_cv_edit(
 # Stub Commands (to be implemented in later sprints)
 # ============================================================================
 
+
 @app.command()
 def login(
     source: str = typer.Argument(..., help="Job board to log into (indeed, linkedin)"),
+    connect_existing: bool = typer.Option(
+        False,
+        "--connect-existing",
+        help="For LinkedIn: connect to existing Chrome browser with remote debugging",
+    ),
 ) -> None:
     """
     Log into a job board using Playwright browser.
@@ -324,29 +341,37 @@ def login(
     Opens a browser window for manual login. Session is saved
     for future scraping.
 
+    For LinkedIn, if login is blocked, use --connect-existing to use your
+    already-running Chrome browser where you're logged in.
+
     Examples:
         jobtool login indeed
         jobtool login linkedin
+        jobtool login linkedin --connect-existing
     """
     if source not in ("indeed", "linkedin"):
         print_error(f"Unknown source: {source}")
         print_info("Valid sources: indeed, linkedin")
         raise typer.Exit(1)
 
-    console.print(Panel.fit(
-        f"[bold blue]Login to {source.title()}[/bold blue]\n\n"
-        "A browser window will open.\n"
-        "Log in manually, then close the browser.",
-        border_style="blue",
-    ))
+    console.print(
+        Panel.fit(
+            f"[bold blue]Login to {source.title()}[/bold blue]\n\n"
+            "A browser window will open.\n"
+            "Log in manually, then close the browser.",
+            border_style="blue",
+        )
+    )
 
     try:
         if source == "indeed":
             from jobtool.scrapers.indeed import login_indeed
+
             login_indeed()
         elif source == "linkedin":
             from jobtool.scrapers.linkedin import login_linkedin
-            login_linkedin()
+
+            login_linkedin(use_existing=connect_existing)
 
         print_success(f"Session saved for {source.title()}")
         print_info(f"You can now run: jobtool scrape 'query' --sources {source}")
@@ -362,11 +387,17 @@ def login(
 def scrape(
     query: str = typer.Argument(..., help="Search query (e.g., 'data entry')"),
     location: str = typer.Option("London", "--location", "-l", help="Job location"),
-    sources: str = typer.Option("reed", "--sources", "-s", help="Comma-separated sources"),
+    sources: str = typer.Option(
+        "reed", "--sources", "-s", help="Comma-separated sources"
+    ),
     max_jobs: int = typer.Option(50, "--max", "-m", help="Max jobs per source"),
     salary_min: int = typer.Option(None, "--salary-min", help="Minimum salary filter"),
-    posted: str = typer.Option(None, "--posted", help="Posted filter: today, week, month"),
-    quick: bool = typer.Option(False, "--quick", "-q", help="Quick mode (shorter descriptions)"),
+    posted: str = typer.Option(
+        None, "--posted", help="Posted filter: today, week, month"
+    ),
+    quick: bool = typer.Option(
+        False, "--quick", "-q", help="Quick mode (shorter descriptions)"
+    ),
 ) -> None:
     """
     Scrape jobs from specified sources.
@@ -383,14 +414,16 @@ def scrape(
 
     source_list = [s.strip().lower() for s in sources.split(",")]
 
-    console.print(Panel.fit(
-        f"[bold blue]Scraping Jobs[/bold blue]\n"
-        f"Query: {query}\n"
-        f"Location: {location}\n"
-        f"Sources: {', '.join(source_list)}\n"
-        f"Max per source: {max_jobs}",
-        border_style="blue",
-    ))
+    console.print(
+        Panel.fit(
+            f"[bold blue]Scraping Jobs[/bold blue]\n"
+            f"Query: {query}\n"
+            f"Location: {location}\n"
+            f"Sources: {', '.join(source_list)}\n"
+            f"Max per source: {max_jobs}",
+            border_style="blue",
+        )
+    )
     console.print()
 
     total_new = 0
@@ -423,7 +456,9 @@ def scrape(
                 total_new += new_count
                 total_duplicate += dup_count
 
-                print_success(f"Reed: {new_count} new jobs, {dup_count} duplicates skipped")
+                print_success(
+                    f"Reed: {new_count} new jobs, {dup_count} duplicates skipped"
+                )
 
             except ReedAPIKeyMissing as e:
                 print_error(str(e))
@@ -460,7 +495,9 @@ def scrape(
                 total_new += new_count
                 total_duplicate += dup_count
 
-                print_success(f"Indeed: {new_count} new jobs, {dup_count} duplicates skipped")
+                print_success(
+                    f"Indeed: {new_count} new jobs, {dup_count} duplicates skipped"
+                )
 
             except IndeedLoginRequired:
                 print_warning("Indeed requires login. Run: jobtool login indeed")
@@ -469,7 +506,10 @@ def scrape(
 
         elif source == "linkedin":
             try:
-                from jobtool.scrapers.linkedin import scrape_linkedin, LinkedInLoginRequired
+                from jobtool.scrapers.linkedin import (
+                    scrape_linkedin,
+                    LinkedInLoginRequired,
+                )
 
                 print_info("Scraping LinkedIn (this may take a while)...")
 
@@ -499,7 +539,9 @@ def scrape(
                 total_new += new_count
                 total_duplicate += dup_count
 
-                print_success(f"LinkedIn: {new_count} new jobs, {dup_count} duplicates skipped")
+                print_success(
+                    f"LinkedIn: {new_count} new jobs, {dup_count} duplicates skipped"
+                )
 
             except LinkedInLoginRequired:
                 print_warning("LinkedIn requires login. Run: jobtool login linkedin")
@@ -511,14 +553,16 @@ def scrape(
 
     # Summary
     console.print()
-    console.print(Panel.fit(
-        f"[bold green]Scraping Complete[/bold green]\n\n"
-        f"New jobs added: {total_new}\n"
-        f"Duplicates skipped: {total_duplicate}\n\n"
-        f"Run [bold]jobtool list[/bold] to see jobs\n"
-        f"Run [bold]jobtool generate <job_id>[/bold] to create CV",
-        border_style="green",
-    ))
+    console.print(
+        Panel.fit(
+            f"[bold green]Scraping Complete[/bold green]\n\n"
+            f"New jobs added: {total_new}\n"
+            f"Duplicates skipped: {total_duplicate}\n\n"
+            f"Run [bold]jobtool list[/bold] to see jobs\n"
+            f"Run [bold]jobtool generate <job_id>[/bold] to create CV",
+            border_style="green",
+        )
+    )
 
 
 @app.command("list")
@@ -584,7 +628,9 @@ def list_jobs(
 def generate(
     job_id: int = typer.Argument(..., help="Job ID to generate CV for"),
     output_dir: Path = typer.Option(
-        None, "--output", "-o",
+        None,
+        "--output",
+        "-o",
         help="Output directory (defaults to ~/.jobtool/applications/)",
     ),
 ) -> None:
@@ -600,7 +646,11 @@ def generate(
     from datetime import datetime
 
     from jobtool.db import get_job_by_id, insert_application, get_application_by_job_id
-    from jobtool.ai.tailor import generate_application, AIGenerationError, APIKeyMissingError
+    from jobtool.ai.tailor import (
+        generate_application,
+        AIGenerationError,
+        APIKeyMissingError,
+    )
     from jobtool.renderer.docx_renderer import render_cv, render_cover_letter, slugify
     from jobtool.renderer.pdf import docx_to_pdf, is_libreoffice_installed
     from jobtool.models import Application
@@ -608,7 +658,9 @@ def generate(
     # Load job from database
     job = get_job_by_id(job_id)
     if not job:
-        print_error(f"Job ID {job_id} not found. Run 'jobtool list' to see available jobs.")
+        print_error(
+            f"Job ID {job_id} not found. Run 'jobtool list' to see available jobs."
+        )
         raise typer.Exit(1)
 
     # Check if already generated
@@ -638,6 +690,7 @@ def generate(
     # Determine output directory
     if output_dir is None:
         from jobtool.config import get_applications_dir
+
         company_slug = slugify(job.company)
         title_slug = slugify(job.title)
         date_str = datetime.now().strftime("%Y-%m-%d")
@@ -645,13 +698,15 @@ def generate(
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    console.print(Panel.fit(
-        f"[bold blue]Generating Application[/bold blue]\n\n"
-        f"Job: {job.title}\n"
-        f"Company: {job.company}\n"
-        f"Location: {job.location or 'Not specified'}",
-        border_style="blue",
-    ))
+    console.print(
+        Panel.fit(
+            f"[bold blue]Generating Application[/bold blue]\n\n"
+            f"Job: {job.title}\n"
+            f"Company: {job.company}\n"
+            f"Location: {job.location or 'Not specified'}",
+            border_style="blue",
+        )
+    )
     console.print()
 
     try:
@@ -703,15 +758,21 @@ def generate(
         print_success("Application generated!")
         console.print()
 
-        console.print(Panel(
-            f"[bold]CV:[/bold] {cv_path}\n"
-            + (f"[bold]CV (PDF):[/bold] {cv_pdf_path}\n" if cv_pdf_path else "")
-            + f"[bold]Cover Letter:[/bold] {cl_path}\n"
-            + (f"[bold]Cover Letter (PDF):[/bold] {cl_pdf_path}\n" if cl_pdf_path else "")
-            + f"\n[bold]Job URL:[/bold] {job.url}",
-            title="Generated Files",
-            border_style="green",
-        ))
+        console.print(
+            Panel(
+                f"[bold]CV:[/bold] {cv_path}\n"
+                + (f"[bold]CV (PDF):[/bold] {cv_pdf_path}\n" if cv_pdf_path else "")
+                + f"[bold]Cover Letter:[/bold] {cl_path}\n"
+                + (
+                    f"[bold]Cover Letter (PDF):[/bold] {cl_pdf_path}\n"
+                    if cl_pdf_path
+                    else ""
+                )
+                + f"\n[bold]Job URL:[/bold] {job.url}",
+                title="Generated Files",
+                border_style="green",
+            )
+        )
 
         console.print()
         print_info("Open the CV and cover letter to review before applying.")
@@ -749,6 +810,7 @@ def review(
         ? - Show help
     """
     from jobtool.review import run_review_loop
+
     run_review_loop(status=status)
 
 
@@ -771,29 +833,35 @@ def apply(
     import re
     from datetime import datetime
 
-    from jobtool.db import insert_job, get_job_by_external_id, get_application_by_job_id, insert_application
+    from jobtool.db import (
+        insert_job,
+        get_job_by_external_id,
+        get_application_by_job_id,
+        insert_application,
+    )
     from jobtool.models import Job, Application
 
-    console.print(Panel.fit(
-        f"[bold blue]Quick Apply[/bold blue]\n\n"
-        f"URL: {url[:60]}...",
-        border_style="blue",
-    ))
+    console.print(
+        Panel.fit(
+            f"[bold blue]Quick Apply[/bold blue]\n\nURL: {url[:60]}...",
+            border_style="blue",
+        )
+    )
     console.print()
 
     # Determine source from URL
     if "reed.co.uk" in url:
         source = "reed"
         # Extract job ID from Reed URL
-        match = re.search(r'/(\d+)\??', url)
+        match = re.search(r"/(\d+)\??", url)
         external_id = match.group(1) if match else None
     elif "indeed.com" in url or "indeed.co.uk" in url:
         source = "indeed"
-        match = re.search(r'jk=([a-f0-9]+)', url)
+        match = re.search(r"jk=([a-f0-9]+)", url)
         external_id = match.group(1) if match else None
     elif "linkedin.com" in url:
         source = "linkedin"
-        match = re.search(r'/jobs/view/(\d+)', url)
+        match = re.search(r"/jobs/view/(\d+)", url)
         external_id = match.group(1) if match else None
     else:
         print_error("Unsupported job URL. Supported: Reed, Indeed, LinkedIn")
@@ -846,14 +914,20 @@ def apply(
                     master_cv = MasterCV.model_validate(json.load(f))
 
                 from jobtool.ai.tailor import generate_application, AIGenerationError
-                from jobtool.renderer.docx_renderer import render_cv, render_cover_letter, slugify
+                from jobtool.renderer.docx_renderer import (
+                    render_cv,
+                    render_cover_letter,
+                    slugify,
+                )
                 from jobtool.renderer.pdf import docx_to_pdf, is_libreoffice_installed
 
                 # Determine output directory
                 company_slug = slugify(job.company)
                 title_slug = slugify(job.title)
                 date_str = datetime.now().strftime("%Y-%m-%d")
-                output_dir = get_applications_dir() / f"{company_slug}-{title_slug}-{date_str}"
+                output_dir = (
+                    get_applications_dir() / f"{company_slug}-{title_slug}-{date_str}"
+                )
                 output_dir.mkdir(parents=True, exist_ok=True)
 
                 print_info("Generating tailored CV...")
@@ -926,7 +1000,9 @@ def history(
 
     if not applications:
         print_info("No applications found.")
-        print_info("Run 'jobtool review' or 'jobtool generate <job_id>' to create applications.")
+        print_info(
+            "Run 'jobtool review' or 'jobtool generate <job_id>' to create applications."
+        )
         return
 
     # Filter by date if requested
@@ -941,7 +1017,9 @@ def history(
         for app, job in applications:
             if app.created_at:
                 try:
-                    app_date = datetime.fromisoformat(app.created_at.replace("Z", "+00:00"))
+                    app_date = datetime.fromisoformat(
+                        app.created_at.replace("Z", "+00:00")
+                    )
                     if app_date.replace(tzinfo=None) >= cutoff:
                         filtered.append((app, job))
                 except Exception:
@@ -956,7 +1034,9 @@ def history(
         return
 
     # Build table
-    table = Table(title=f"Application History ({len(applications)} records)", show_header=True)
+    table = Table(
+        title=f"Application History ({len(applications)} records)", show_header=True
+    )
     table.add_column("ID", style="cyan", width=5)
     table.add_column("Date", width=12)
     table.add_column("Company", style="yellow", max_width=20)
@@ -1003,14 +1083,17 @@ def history(
     submitted = sum(1 for app, _ in applications if app.status == "submitted")
     pending = sum(1 for app, _ in applications if app.status == "pending")
 
-    console.print(f"[bold]Summary:[/bold] {total} applications - "
-                  f"[green]{submitted} submitted[/green], "
-                  f"[white]{pending} pending[/white]")
+    console.print(
+        f"[bold]Summary:[/bold] {total} applications - "
+        f"[green]{submitted} submitted[/green], "
+        f"[white]{pending} pending[/white]"
+    )
 
 
 # ============================================================================
 # Renderer Test Command (Day 2)
 # ============================================================================
+
 
 @app.command("render-test")
 def render_test(
@@ -1054,7 +1137,12 @@ def render_test(
     # Determine CV source
     if cv_path is None:
         # Try test fixture first, then user's Master CV
-        fixture_path = Path(__file__).parent.parent / "tests" / "fixtures" / "sample-master-cv.json"
+        fixture_path = (
+            Path(__file__).parent.parent
+            / "tests"
+            / "fixtures"
+            / "sample-master-cv.json"
+        )
         if fixture_path.exists():
             cv_path = fixture_path
             print_info(f"Using test fixture: {cv_path}")
@@ -1085,10 +1173,12 @@ def render_test(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Render the CV
-    console.print(Panel.fit(
-        "[bold blue]Rendering ATS-Compliant CV[/bold blue]",
-        border_style="blue",
-    ))
+    console.print(
+        Panel.fit(
+            "[bold blue]Rendering ATS-Compliant CV[/bold blue]",
+            border_style="blue",
+        )
+    )
 
     try:
         output_file = render_cv(cv, output_dir, job_title)
@@ -1111,20 +1201,22 @@ def render_test(
 
     # Print verification checklist
     console.print()
-    console.print(Panel(
-        "[bold]ATS Compliance Checklist[/bold]\n\n"
-        "Open the DOCX file and verify:\n"
-        "  1. Single column layout (no tables)\n"
-        "  2. Arial font throughout (11pt body, 14pt headings, 18pt name)\n"
-        "  3. Standard section headings (Personal Statement, Work Experience, etc.)\n"
-        "  4. Contact details in body (not header/footer)\n"
-        "  5. Solid round bullets\n"
-        "  6. 2cm margins\n"
-        "  7. Ends with 'References available on request'\n\n"
-        "[bold]Then upload to Jobscan to verify parse success.[/bold]",
-        title="Next Steps",
-        border_style="yellow",
-    ))
+    console.print(
+        Panel(
+            "[bold]ATS Compliance Checklist[/bold]\n\n"
+            "Open the DOCX file and verify:\n"
+            "  1. Single column layout (no tables)\n"
+            "  2. Arial font throughout (11pt body, 14pt headings, 18pt name)\n"
+            "  3. Standard section headings (Personal Statement, Work Experience, etc.)\n"
+            "  4. Contact details in body (not header/footer)\n"
+            "  5. Solid round bullets\n"
+            "  6. 2cm margins\n"
+            "  7. Ends with 'References available on request'\n\n"
+            "[bold]Then upload to Jobscan to verify parse success.[/bold]",
+            title="Next Steps",
+            border_style="yellow",
+        )
+    )
 
 
 # ============================================================================
