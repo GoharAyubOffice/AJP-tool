@@ -305,11 +305,9 @@ async def _connect_to_existing_chrome() -> tuple | None:
 
     To use this:
     1. Close all Chrome windows
-    2. Open Run dialog (Win+R)
-    3. Paste this path with your Chrome path:
-       "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --profile-directory=Default
-    4. Log into LinkedIn in that Chrome window (keep it open!)
-    5. Run jobtool with --connect-existing flag
+    2. Run Chrome with: --remote-debugging-port=9222 --user-data-dir=<temp-dir>
+    3. Log into LinkedIn in that Chrome window (keep it open!)
+    4. Run jobtool with --connect-existing flag
 
     Returns:
         Tuple of (context, page) if successful, None if failed
@@ -319,13 +317,24 @@ async def _connect_to_existing_chrome() -> tuple | None:
             # Try to connect to Chrome via CDP
             browser = await p.chromium.connect_over_cdp("http://localhost:9222")
 
-            # Get ALL existing pages (tabs)
-            existing_pages = browser.pages
-            print(f"[INFO] Found {len(existing_pages)} existing tabs")
+            # Get existing contexts from the browser
+            contexts = browser.contexts
+            print(f"[INFO] Found {len(contexts)} browser contexts")
+
+            # Get ALL existing pages from ALL contexts
+            all_pages = []
+            for ctx in contexts:
+                try:
+                    pages = ctx.pages
+                    all_pages.extend(pages)
+                except Exception:
+                    pass
+
+            print(f"[INFO] Found {len(all_pages)} total tabs")
 
             # Look for LinkedIn in existing tabs
             linkedin_page = None
-            for page in existing_pages:
+            for page in all_pages:
                 try:
                     url = page.url
                     if (
@@ -334,7 +343,7 @@ async def _connect_to_existing_chrome() -> tuple | None:
                         and "login" not in url.lower()
                     ):
                         linkedin_page = page
-                        print(f"[SUCCESS] Found existing LinkedIn tab: {url[:50]}...")
+                        print(f"[SUCCESS] Found existing LinkedIn tab")
                         break
                 except Exception:
                     pass
