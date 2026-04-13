@@ -308,7 +308,7 @@ async def _connect_to_existing_chrome() -> tuple | None:
     2. Open Run dialog (Win+R)
     3. Paste this path with your Chrome path:
        "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --profile-directory=Default
-    4. Log into LinkedIn in that Chrome window
+    4. Log into LinkedIn in that Chrome window (keep it open!)
     5. Run jobtool with --connect-existing flag
 
     Returns:
@@ -319,26 +319,59 @@ async def _connect_to_existing_chrome() -> tuple | None:
             # Try to connect to Chrome via CDP
             browser = await p.chromium.connect_over_cdp("http://localhost:9222")
 
-            # Get existing contexts
-            contexts = browser.contexts
-            if contexts:
-                context = contexts[0]
-            else:
-                context = await browser.new_context()
+            # Get ALL existing pages (tabs)
+            existing_pages = browser.pages
+            print(f"[INFO] Found {len(existing_pages)} existing tabs")
 
-            page = await context.new_page()
+            # Look for LinkedIn in existing tabs
+            linkedin_page = None
+            for page in existing_pages:
+                try:
+                    url = page.url
+                    if (
+                        url
+                        and "linkedin.com" in url.lower()
+                        and "login" not in url.lower()
+                    ):
+                        linkedin_page = page
+                        print(f"[SUCCESS] Found existing LinkedIn tab: {url[:50]}...")
+                        break
+                except Exception:
+                    pass
 
-            # Test connection
-            await page.goto(f"{LINKEDIN_BASE_URL}/feed", timeout=10000)
-            await _random_delay(2, 4)
-
-            if "login" not in page.url.lower():
-                print("[SUCCESS] Connected to existing Chrome session!")
-                return (context, page)
-            else:
-                print("[WARN] Chrome is not logged into LinkedIn")
+            if not linkedin_page:
+                print("[WARN] No logged-in LinkedIn tab found.")
+                print("[INFO] Please open LinkedIn in Chrome and log in first.")
                 await browser.close()
                 return None
+
+            # Get cookies from the LinkedIn page's context
+            try:
+                cookies = await linkedin_page.context.cookies()
+                print(f"[INFO] Got {len(cookies)} cookies from LinkedIn")
+            except Exception as e:
+                print(f"[WARN] Could not get cookies: {e}")
+                await browser.close()
+                return None
+
+            # Create a new context with those cookies
+            new_context = await browser.new_context()
+            await new_context.add_cookies(cookies)
+
+            # Create a new page in this context
+            new_page = await new_context.new_page()
+
+            # Test that we can access LinkedIn with these cookies
+            await new_page.goto(f"{LINKEDIN_BASE_URL}/feed", timeout=10000)
+            await asyncio.sleep(1)
+
+            if "login" in new_page.url.lower():
+                print("[WARN] Cookies did not grant access - please log in again")
+                await browser.close()
+                return None
+
+            print("[SUCCESS] Connected to existing LinkedIn session!")
+            return (new_context, new_page)
 
     except Exception as e:
         print(f"[WARN] Could not connect to existing Chrome: {e}")
