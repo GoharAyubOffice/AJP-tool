@@ -408,10 +408,11 @@ async def scrape_linkedin_async(
         List of Job objects
     """
     context_path = get_linkedin_context_path()
-    use_existing_context = context_path.exists()
+    use_saved_context = context_path.exists()
 
     jobs: list[Job] = []
     user_agent = random.choice(USER_AGENTS)
+    connected_to_live_chrome = False
 
     async with async_playwright() as p:
         viewport_width = random.randint(1200, 1920)
@@ -420,10 +421,46 @@ async def scrape_linkedin_async(
         context = None
         page = None
 
-        if use_existing_context:
-            print("[INFO] Using saved LinkedIn session...")
+        # First, try to connect to existing Chrome if it's running with remote debugging
+        print("[INFO] Checking for existing Chrome with remote debugging...")
+        try:
+            browser = await p.chromium.connect_over_cdp("http://localhost:9222")
+            contexts = browser.contexts
+
+            # Find LinkedIn tab
+            all_pages = []
+            for ctx in contexts:
+                try:
+                    all_pages.extend(ctx.pages)
+                except Exception:
+                    pass
+
+            for pg in all_pages:
+                try:
+                    if (
+                        pg.url
+                        and "linkedin.com" in pg.url.lower()
+                        and "login" not in pg.url.lower()
+                    ):
+                        cookies = await pg.context.cookies()
+                        context = await browser.new_context()
+                        await context.add_cookies(cookies)
+                        page = await context.new_page()
+                        print("[INFO] Connected to existing Chrome session")
+                        connected_to_live_chrome = True
+                        break
+                except Exception:
+                    pass
+
+            if not connected_to_live_chrome:
+                await browser.close()
+        except Exception:
+            pass
+
+        # If not connected to live Chrome, try saved session
+        if not connected_to_live_chrome and use_saved_context:
+            print("[INFO] Trying saved LinkedIn session...")
             try:
-                # Try Firefox first (less detected)
                 context = await p.firefox.launch_persistent_context(
                     str(context_path),
                     headless=True,
@@ -431,7 +468,6 @@ async def scrape_linkedin_async(
                     viewport={"width": viewport_width, "height": viewport_height},
                 )
             except Exception:
-                # Fall back to Chromium with stealth args
                 try:
                     context = await p.chromium.launch_persistent_context(
                         str(context_path),
@@ -443,28 +479,23 @@ async def scrape_linkedin_async(
                 except Exception as e:
                     print(f"[WARN] Could not use saved context: {e}")
                     context = None
-        else:
-            print("[INFO] No saved LinkedIn session. Trying Firefox...")
 
+        # If still no context, create new headless browser
+        if context is None and not connected_to_live_chrome:
+            print("[INFO] No saved session. Trying headless browser...")
             try:
-                browser = await p.firefox.launch(
-                    headless=True,
-                    user_agent=user_agent,
-                )
+                browser = await p.firefox.launch(headless=True, user_agent=user_agent)
                 context = await browser.new_context(
                     user_agent=user_agent,
                     viewport={"width": viewport_width, "height": viewport_height},
                     locale="en-GB",
-                    extra_http_headers={
-                        "Accept-Language": "en-GB,en;q=0.9",
-                    },
+                    extra_http_headers={"Accept-Language": "en-GB,en;q=0.9"},
                 )
             except Exception as e:
                 print(f"[WARN] Firefox failed: {e}")
                 try:
                     context = await p.chromium.launch(
-                        headless=True,
-                        user_agent=user_agent,
+                        headless=True, user_agent=user_agent
                     )
                     context = await context.new_context(
                         user_agent=user_agent,
@@ -480,8 +511,9 @@ async def scrape_linkedin_async(
             print("[ERROR] Could not create browser context")
             return []
 
-        page = await context.new_page()
-        await _add_stealth_scripts(page)
+        if not connected_to_live_chrome:
+            page = await context.new_page()
+            await _add_stealth_scripts(page)
 
         try:
             await page.goto(f"{LINKEDIN_BASE_URL}/feed", wait_until="domcontentloaded")
@@ -642,8 +674,11 @@ async def login_linkedin_async(use_existing: bool = False) -> None:
             print("=" * 60)
             print("\n[OK] Successfully connected to your existing Chrome session!")
             print("[OK] Your logged-in LinkedIn session will be used for scraping.")
+            print("\nIMPORTANT: Keep Chrome OPEN while scraping.")
             print("\nYou can now run: jobtool scrape 'data entry' --sources linkedin")
             print("=" * 60 + "\n")
+            # Don't close the browser - user keeps it open for scraping
+            return
         else:
             print("\n" + "=" * 60)
             print("LinkedIn Login")
@@ -655,7 +690,7 @@ async def login_linkedin_async(use_existing: bool = False) -> None:
             print("  2. Open Run dialog (Win+R)")
             print("  3. Paste this command:")
             print(
-                '     "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --profile-directory=Default'
+                '     "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" --remote-debugging-port=9222 --profile-directory=Default'
             )
             print("  4. Press Enter - Chrome will open")
             print("  5. Log into LinkedIn manually in that Chrome")
@@ -668,15 +703,15 @@ async def login_linkedin_async(use_existing: bool = False) -> None:
             except Exception:
                 pass
 
-        # Save session
-        try:
-            storage = await context.storage_state()
-            (context_path / "storage_state.json").write_text(json.dumps(storage))
-            print("[INFO] Session saved!")
-        except Exception as e:
-            print(f"[WARN] Could not save session: {e}")
+            # Save session for non-connected mode
+            try:
+                storage = await context.storage_state()
+                (context_path / "storage_state.json").write_text(json.dumps(storage))
+                print("[INFO] Session saved!")
+            except Exception as e:
+                print(f"[WARN] Could not save session: {e}")
 
-        await context.close()
+            await context.close()
 
 
 def login_linkedin(use_existing: bool = False) -> None:
