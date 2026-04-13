@@ -26,11 +26,13 @@ from jobtool.models import Job
 
 class IndeedScraperError(Exception):
     """Raised when Indeed scraping fails."""
+
     pass
 
 
 class IndeedLoginRequired(Exception):
     """Raised when Indeed login is required."""
+
     pass
 
 
@@ -111,13 +113,15 @@ async def _extract_job_from_card(page: Page, card) -> Job | None:
         location = await location_elem.inner_text() if location_elem else ""
 
         # Get salary (if shown)
-        salary_elem = await card.query_selector("[data-testid='attribute_snippet_testid']")
+        salary_elem = await card.query_selector(
+            "[data-testid='attribute_snippet_testid']"
+        )
         salary_min = None
         salary_max = None
         if salary_elem:
             salary_text = await salary_elem.inner_text()
             # Try to parse salary (e.g., "£25,000 - £30,000 a year")
-            salary_match = re.findall(r'£([\d,]+)', salary_text)
+            salary_match = re.findall(r"£([\d,]+)", salary_text)
             if len(salary_match) >= 1:
                 salary_min = int(salary_match[0].replace(",", ""))
             if len(salary_match) >= 2:
@@ -180,6 +184,9 @@ async def scrape_indeed_async(
     """
     Scrape jobs from Indeed using Playwright.
 
+    Indeed allows browsing jobs without login. Login is only needed
+    for accessing saved searches or applying through Indeed.
+
     Args:
         query: Search keywords
         location: Job location
@@ -190,22 +197,29 @@ async def scrape_indeed_async(
         List of Job objects
     """
     context_path = get_indeed_context_path()
-
-    if not context_path.exists():
-        raise IndeedLoginRequired(
-            "Indeed browser context not found. Run 'jobtool login indeed' first."
-        )
+    use_existing_context = context_path.exists()
 
     jobs: list[Job] = []
 
     async with async_playwright() as p:
-        # Launch browser with persistent context
-        context = await p.chromium.launch_persistent_context(
-            str(context_path),
-            headless=True,
-            user_agent=USER_AGENT,
-            viewport={"width": 1920, "height": 1080},
-        )
+        if use_existing_context:
+            # Use existing logged-in session
+            context = await p.chromium.launch_persistent_context(
+                str(context_path),
+                headless=True,
+                user_agent=USER_AGENT,
+                viewport={"width": 1920, "height": 1080},
+            )
+        else:
+            # Create temporary context without login (works for most job listings)
+            context = await p.chromium.launch(
+                headless=True,
+                user_agent=USER_AGENT,
+            )
+            context = await context.new_context(
+                user_agent=USER_AGENT,
+                viewport={"width": 1920, "height": 1080},
+            )
 
         page = await context.new_page()
 
@@ -221,7 +235,9 @@ async def scrape_indeed_async(
                 await _human_scroll(page)
 
                 # Find job cards
-                cards = await page.query_selector_all(".job_seen_beacon, .jobsearch-ResultsList > li")
+                cards = await page.query_selector_all(
+                    ".job_seen_beacon, .jobsearch-ResultsList > li"
+                )
 
                 if not cards:
                     break
@@ -235,7 +251,9 @@ async def scrape_indeed_async(
                         jobs.append(job)
 
                 # Check if there are more pages
-                next_button = await page.query_selector("[data-testid='pagination-page-next']")
+                next_button = await page.query_selector(
+                    "[data-testid='pagination-page-next']"
+                )
                 if not next_button:
                     break
 
@@ -274,12 +292,14 @@ def scrape_indeed(
     Returns:
         List of Job objects
     """
-    return asyncio.run(scrape_indeed_async(
-        query=query,
-        location=location,
-        max_jobs=max_jobs,
-        fetch_descriptions=fetch_descriptions,
-    ))
+    return asyncio.run(
+        scrape_indeed_async(
+            query=query,
+            location=location,
+            max_jobs=max_jobs,
+            fetch_descriptions=fetch_descriptions,
+        )
+    )
 
 
 async def login_indeed_async() -> None:
@@ -288,6 +308,12 @@ async def login_indeed_async() -> None:
 
     The user logs in manually, and the session is saved
     to a persistent browser context for future scraping.
+
+    NOTE: Indeed/Google may block login from automated browsers.
+    If you see "Browser not secure" message, try:
+    1. Open Chrome directly and log in at https://www.indeed.com
+    2. Export your cookies and place them in ~/.jobtool/browser-contexts/indeed/
+    3. Or simply continue without login - most jobs can be scraped without it
     """
     context_path = get_indeed_context_path()
     context_path.mkdir(parents=True, exist_ok=True)
@@ -311,6 +337,10 @@ async def login_indeed_async() -> None:
         print("=" * 60)
         print("\nA browser window has opened.")
         print("Please log in to your Indeed account.")
+        print("\nIf you see 'Browser not secure' error:")
+        print("  - This is normal when using automated browsers")
+        print("  - You can still try to log in, or skip login entirely")
+        print("  - Most jobs can be scraped WITHOUT login")
         print("\nOnce logged in, close the browser window or press Ctrl+C.")
         print("Your session will be saved for future scraping.")
         print("=" * 60 + "\n")

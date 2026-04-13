@@ -28,11 +28,13 @@ from jobtool.models import Job
 
 class LinkedInScraperError(Exception):
     """Raised when LinkedIn scraping fails."""
+
     pass
 
 
 class LinkedInLoginRequired(Exception):
     """Raised when LinkedIn login is required."""
+
     pass
 
 
@@ -107,7 +109,7 @@ async def _extract_job_from_card(card) -> Job | None:
             if link:
                 href = await link.get_attribute("href")
                 if href:
-                    match = re.search(r'/jobs/view/(\d+)', href)
+                    match = re.search(r"/jobs/view/(\d+)", href)
                     if match:
                         job_id = match.group(1)
 
@@ -117,13 +119,17 @@ async def _extract_job_from_card(card) -> Job | None:
         # Get title
         title_elem = await card.query_selector(".job-card-list__title")
         if not title_elem:
-            title_elem = await card.query_selector("a[data-control-name='job_card_title']")
+            title_elem = await card.query_selector(
+                "a[data-control-name='job_card_title']"
+            )
         title = await title_elem.inner_text() if title_elem else "Unknown Title"
 
         # Get company
         company_elem = await card.query_selector(".job-card-container__company-name")
         if not company_elem:
-            company_elem = await card.query_selector(".job-card-container__primary-description")
+            company_elem = await card.query_selector(
+                ".job-card-container__primary-description"
+            )
         company = await company_elem.inner_text() if company_elem else "Unknown Company"
 
         # Get location
@@ -199,8 +205,8 @@ async def scrape_linkedin_async(
     """
     Scrape jobs from LinkedIn using Playwright.
 
-    CAUTION: LinkedIn has aggressive anti-bot measures.
-    Keep max_jobs low (25-50) and don't run too frequently.
+    LinkedIn has aggressive anti-bot measures. If no login context exists,
+    this will attempt to use a temporary browser context (may have limited results).
 
     Args:
         query: Search keywords
@@ -212,26 +218,42 @@ async def scrape_linkedin_async(
         List of Job objects
     """
     context_path = get_linkedin_context_path()
-
-    if not context_path.exists():
-        raise LinkedInLoginRequired(
-            "LinkedIn browser context not found. Run 'jobtool login linkedin' first."
-        )
+    use_existing_context = context_path.exists()
 
     jobs: list[Job] = []
 
     async with async_playwright() as p:
-        # Launch browser with persistent context
         # Add some randomness to viewport
         viewport_width = random.randint(1200, 1920)
         viewport_height = random.randint(800, 1080)
 
-        context = await p.chromium.launch_persistent_context(
-            str(context_path),
-            headless=True,
-            user_agent=USER_AGENT,
-            viewport={"width": viewport_width, "height": viewport_height},
-        )
+        if use_existing_context:
+            # Use existing logged-in session
+            context = await p.chromium.launch_persistent_context(
+                str(context_path),
+                headless=True,
+                user_agent=USER_AGENT,
+                viewport={"width": viewport_width, "height": viewport_height},
+            )
+        else:
+            # Try without login - LinkedIn may still show some jobs
+            # Use Firefox instead as it may be less detected
+            try:
+                browser = await p.firefox.launch(headless=True)
+                context = await browser.new_context(
+                    user_agent=USER_AGENT,
+                    viewport={"width": viewport_width, "height": viewport_height},
+                )
+            except Exception:
+                # Fall back to Chromium
+                context = await p.chromium.launch(
+                    headless=True,
+                    user_agent=USER_AGENT,
+                )
+                context = await context.new_context(
+                    user_agent=USER_AGENT,
+                    viewport={"width": viewport_width, "height": viewport_height},
+                )
 
         page = await context.new_page()
 
@@ -249,11 +271,15 @@ async def scrape_linkedin_async(
                 await _random_delay()
                 await _human_scroll(page)
 
-                # Wait for job cards to load
-                await page.wait_for_selector(
-                    ".jobs-search-results__list-item, .job-card-container",
-                    timeout=10000
-                )
+                # Wait for job cards to load (with timeout)
+                try:
+                    await page.wait_for_selector(
+                        ".jobs-search-results__list-item, .job-card-container",
+                        timeout=10000,
+                    )
+                except Exception:
+                    # No jobs found or page didn't load properly
+                    break
 
                 # Find job cards
                 cards = await page.query_selector_all(
@@ -312,12 +338,14 @@ def scrape_linkedin(
     Returns:
         List of Job objects
     """
-    return asyncio.run(scrape_linkedin_async(
-        query=query,
-        location=location,
-        max_jobs=max_jobs,
-        fetch_descriptions=fetch_descriptions,
-    ))
+    return asyncio.run(
+        scrape_linkedin_async(
+            query=query,
+            location=location,
+            max_jobs=max_jobs,
+            fetch_descriptions=fetch_descriptions,
+        )
+    )
 
 
 async def login_linkedin_async() -> None:
@@ -326,6 +354,11 @@ async def login_linkedin_async() -> None:
 
     The user logs in manually, and the session is saved
     to a persistent browser context for future scraping.
+
+    NOTE: LinkedIn has VERY aggressive anti-bot measures.
+    Login may be blocked even in manual browser mode.
+    If login fails, the scraper will attempt to work without login,
+    but results may be limited.
     """
     context_path = get_linkedin_context_path()
     context_path.mkdir(parents=True, exist_ok=True)
@@ -349,8 +382,10 @@ async def login_linkedin_async() -> None:
         print("=" * 60)
         print("\nA browser window has opened.")
         print("Please log in to your LinkedIn account.")
-        print("\nIMPORTANT: Use a secondary LinkedIn account if possible,")
-        print("as scraping may risk account restrictions.")
+        print("\nIMPORTANT: LinkedIn has very aggressive anti-bot detection.")
+        print("  - Login may be blocked even in manual mode")
+        print("  - Consider using a secondary account")
+        print("  - Scraping without login may still work with limited results")
         print("\nOnce logged in, close the browser window or press Ctrl+C.")
         print("Your session will be saved for future scraping.")
         print("=" * 60 + "\n")
