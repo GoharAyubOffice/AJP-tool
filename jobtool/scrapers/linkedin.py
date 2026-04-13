@@ -569,16 +569,25 @@ async def login_linkedin_async(use_existing: bool = False) -> None:
     async with async_playwright() as p:
         context = None
         page = None
+        connected_to_existing = False
 
         if use_existing:
             # Try to connect to existing Chrome
             print("[INFO] Trying to connect to existing Chrome...")
+            print(
+                "[INFO] Make sure Chrome is running with --remote-debugging-port=9222"
+            )
             result = await _connect_to_existing_chrome()
             if result:
                 context, page = result
+                connected_to_existing = True
             else:
-                print("[INFO] Could not connect to existing Chrome.")
-                print("[INFO] Falling back to automated browser...")
+                print("[ERROR] Could not connect to Chrome with remote debugging.")
+                print(
+                    "[ERROR] Make sure Chrome is open with: --remote-debugging-port=9222"
+                )
+                print("[ERROR] OR remove --connect-existing to use automated browser")
+                return
 
         if context is None:
             # Launch Firefox for login (less detected)
@@ -618,28 +627,37 @@ async def login_linkedin_async(use_existing: bool = False) -> None:
             await _add_stealth_scripts(page)
             await page.goto(f"{LINKEDIN_BASE_URL}/login")
 
-        print("\n" + "=" * 60)
-        print("LinkedIn Login")
-        print("=" * 60)
-        print("\nA browser window has opened.")
-        print("Please log in to your LinkedIn account.")
-        print("\nIf login shows 'Browser not secure':")
-        print("  1. Press Ctrl+C to cancel")
-        print("  2. Open Run dialog (Win+R)")
-        print("  3. Paste this command:")
-        print(
-            '     "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" --remote-debugging-port=9222 --profile-directory=Default'
-        )
-        print("  4. Press Enter - Chrome will open")
-        print("  5. Log into LinkedIn manually in that Chrome")
-        print("  6. Then run: jobtool login linkedin --connect-existing")
-        print("\nClose the browser window when done.")
-        print("=" * 60 + "\n")
+        if connected_to_existing:
+            print("\n" + "=" * 60)
+            print("LinkedIn Session Connected")
+            print("=" * 60)
+            print("\n[OK] Successfully connected to your existing Chrome session!")
+            print("[OK] Your logged-in LinkedIn session will be used for scraping.")
+            print("\nYou can now run: jobtool scrape 'data entry' --sources linkedin")
+            print("=" * 60 + "\n")
+        else:
+            print("\n" + "=" * 60)
+            print("LinkedIn Login")
+            print("=" * 60)
+            print("\nA browser window has opened.")
+            print("Please log in to your LinkedIn account.")
+            print("\nIf login shows 'Browser not secure':")
+            print("  1. Press Ctrl+C to cancel")
+            print("  2. Open Run dialog (Win+R)")
+            print("  3. Paste this command:")
+            print(
+                '     "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --profile-directory=Default'
+            )
+            print("  4. Press Enter - Chrome will open")
+            print("  5. Log into LinkedIn manually in that Chrome")
+            print("  6. Then run: jobtool login linkedin --connect-existing")
+            print("\nClose the browser window when done.")
+            print("=" * 60 + "\n")
 
-        try:
-            await page.wait_for_timeout(3600000)
-        except Exception:
-            pass
+            try:
+                await page.wait_for_timeout(3600000)
+            except Exception:
+                pass
 
         # Save session
         try:
