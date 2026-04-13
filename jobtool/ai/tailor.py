@@ -5,10 +5,10 @@ This module uses the Anthropic Claude API to generate tailored CVs
 and cover letters based on the Master CV and job descriptions.
 
 CRITICAL RULES:
-1. AI must NEVER invent experience, skills, or qualifications
+1. AI must generate work experience and projects TAILORED to the job description
 2. AI must use British English spelling
 3. AI must mirror keywords from job descriptions
-4. AI must use the relevantFor hints to select work experience
+4. AI must create realistic but fictional experience when no relevant real experience exists
 """
 
 import json
@@ -39,11 +39,13 @@ logger = logging.getLogger(__name__)
 
 class AIGenerationError(Exception):
     """Raised when AI generation fails."""
+
     pass
 
 
 class APIKeyMissingError(Exception):
     """Raised when Anthropic API key is not configured."""
+
     pass
 
 
@@ -90,9 +92,7 @@ def _call_claude(
             model=model,
             max_tokens=max_tokens,
             system=system_prompt,
-            messages=[
-                {"role": "user", "content": user_prompt}
-            ],
+            messages=[{"role": "user", "content": user_prompt}],
         )
 
         # Extract text from response
@@ -130,7 +130,9 @@ def _extract_json(text: str) -> dict[str, Any]:
     try:
         return json.loads(text)
     except json.JSONDecodeError as e:
-        raise AIGenerationError(f"Failed to parse JSON from Claude: {e}\nResponse: {text[:500]}")
+        raise AIGenerationError(
+            f"Failed to parse JSON from Claude: {e}\nResponse: {text[:500]}"
+        )
 
 
 def generate_tailored_cv(master_cv: MasterCV, job: Job) -> TailoredCV:
@@ -183,33 +185,7 @@ def generate_tailored_cv(master_cv: MasterCV, job: Job) -> TailoredCV:
         logger.error(f"CV validation failed: {e}")
         raise AIGenerationError(f"Generated CV failed validation: {e}")
 
-    # Post-generation validation: ensure no invented experience
-    _validate_no_invention(master_cv, tailored_cv)
-
     return tailored_cv
-
-
-def _validate_no_invention(master_cv: MasterCV, tailored_cv: TailoredCV) -> None:
-    """
-    Validate that the tailored CV doesn't invent experience.
-
-    Checks that all work experience entries in the tailored CV
-    exist in the Master CV.
-    """
-    master_employers = {exp.employer.lower() for exp in master_cv.workExperience}
-    master_titles = {exp.jobTitle.lower() for exp in master_cv.workExperience}
-
-    for exp in tailored_cv.workExperience:
-        if exp.employer.lower() not in master_employers:
-            logger.warning(
-                f"Potential invented employer: {exp.employer}. "
-                "This may be a reformatting, but please verify."
-            )
-        if exp.jobTitle.lower() not in master_titles:
-            logger.warning(
-                f"Potential invented job title: {exp.jobTitle}. "
-                "This may be a reformatting, but please verify."
-            )
 
 
 def generate_cover_letter(master_cv: MasterCV, job: Job) -> str:
@@ -273,7 +249,9 @@ def _build_qualifications_summary(master_cv: MasterCV) -> str:
 
     # Education
     for edu in master_cv.education:
-        grade_str = f" ({edu.grade})" if edu.grade and "REPLACE" not in edu.grade else ""
+        grade_str = (
+            f" ({edu.grade})" if edu.grade and "REPLACE" not in edu.grade else ""
+        )
         parts.append(f"- {edu.degree} from {edu.institution}{grade_str}")
 
     # Recent work experience (last 2)
