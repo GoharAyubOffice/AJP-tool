@@ -1,5 +1,23 @@
 # JobAutoApply - Complete Usage Guide
 
+## EASIEST WAY: Interactive Menu
+
+Just run:
+```bash
+jobtool interactive
+```
+
+This opens a menu-driven interface where you can:
+- Scrape jobs from Reed, Indeed, LinkedIn
+- View jobs
+- Generate CVs
+- Review and apply
+- Track history
+
+No need to remember commands - just select options with numbers or arrows!
+
+---
+
 ## Quick Start
 
 ### 1. Setup (One Time)
@@ -14,6 +32,22 @@ jobtool master-cv validate
 # Edit your Master CV if needed
 jobtool master-cv edit
 ```
+
+---
+
+## Interactive Menu Options
+
+The interactive menu (`jobtool interactive`) provides:
+
+| Menu | What it does |
+|------|--------------|
+| 🔍 Scrape Jobs | Search Reed, Indeed, LinkedIn |
+| 📋 List Jobs | View all scraped jobs |
+| 📄 Generate CV | Create tailored CV for a job |
+| ✅ Review & Apply | Loop through jobs, generate CVs, apply |
+| 📊 History | View past applications |
+| ⚙️ Setup | Configure Master CV, API keys |
+| ❓ Help | Show instructions |
 
 ---
 
@@ -202,6 +236,7 @@ jobtool master-cv edit
 
 | Command | Description |
 |---------|-------------|
+| `jobtool interactive` | Launch interactive menu (recommended!) |
 | `jobtool init` | Initialize data directory and database |
 | `jobtool master-cv validate` | Validate Master CV JSON |
 | `jobtool master-cv edit` | Edit Master CV in editor |
