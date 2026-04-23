@@ -80,6 +80,112 @@ def print_warning(msg: str):
     console.print(f"[yellow]⚠[/yellow] {msg}")
 
 
+# ============================================================================
+# Browser Automation Helpers
+# ============================================================================
+
+
+def check_chrome_remote_debugging() -> bool:
+    """Check if Chrome is running with remote debugging on port 9222."""
+    import socket
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    result = sock.connect_ex(("127.0.0.1", 9222))
+    sock.close()
+    return result == 0
+
+
+def open_chrome_with_debugging():
+    """Open Chrome with remote debugging enabled."""
+    import subprocess
+
+    clear_screen()
+    print_banner()
+    rprint("\n[bold yellow]OPENING CHROME FOR LINKEDIN[/bold yellow]\n")
+
+    print_info("Chrome needs to be open for LinkedIn scraping.")
+    print_info("I'll open it with remote debugging enabled.\n")
+
+    debug_profile = os.path.join(os.environ.get("TEMP", ""), "chrome-jobtool-debug")
+    os.makedirs(debug_profile, exist_ok=True)
+
+    chrome_paths = [
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe",
+    ]
+
+    chrome_path = None
+    for path in chrome_paths:
+        if os.path.exists(path):
+            chrome_path = path
+            break
+
+    if not chrome_path:
+        print_error("Chrome or Brave not found!")
+        return False
+
+    print_info(f"Opening {os.path.basename(chrome_path)}...")
+
+    try:
+        subprocess.Popen(
+            [
+                chrome_path,
+                "--remote-debugging-port=9222",
+                f"--user-data-dir={debug_profile}",
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        print_success("Chrome opened!")
+        print_info("Please log into LinkedIn in the Chrome window.")
+        print_info("Keep Chrome OPEN while scraping.\n")
+
+        # Wait for Chrome to start
+        import time
+
+        for i in range(10):
+            time.sleep(1)
+            if check_chrome_remote_debugging():
+                print_success("Chrome is ready!")
+                return True
+
+        print_warning("Chrome may still be starting...")
+        return True
+
+    except Exception as e:
+        print_error(f"Failed to open Chrome: {e}")
+        return False
+
+
+def ensure_chrome_for_linkedin():
+    """Ensure Chrome is open with remote debugging for LinkedIn."""
+    if check_chrome_remote_debugging():
+        print_info("Chrome is already running with remote debugging.")
+        return True
+    else:
+        print_warning("Chrome is not running with remote debugging.")
+        if questionary.confirm("Open Chrome now?").ask():
+            return open_chrome_with_debugging()
+        return False
+
+
+def check_linkedin_logged_in() -> bool:
+    """Check if LinkedIn is logged in via the Chrome session."""
+    try:
+        import httpx
+
+        response = httpx.get("http://localhost:9222/json", timeout=5)
+        if response.status_code == 200:
+            pages = response.json()
+            for page in pages:
+                if "linkedin.com" in page.get("url", ""):
+                    if "login" not in page.get("url", "").lower():
+                        return True
+    except Exception:
+        pass
+    return False
+
+
 def confirm(prompt: str) -> bool:
     """Ask for confirmation."""
     response = questionary.confirm(prompt).ask()
@@ -154,8 +260,7 @@ def setup_menu():
         "Edit Master CV",
         "Validate Master CV",
         "Check API Keys",
-        "Login to Indeed",
-        "Login to LinkedIn",
+        "Open LinkedIn Browser",
         "Back to Main Menu",
     ]
 
@@ -169,10 +274,31 @@ def setup_menu():
         validate_master_cv()
     elif choice == "Check API Keys":
         check_api_keys()
-    elif choice == "Login to Indeed":
-        login_indeed()
-    elif choice == "Login to LinkedIn":
-        login_linkedin()
+    elif choice == "Open LinkedIn Browser":
+        open_linkedin_browser()
+    elif choice == "Back to Main Menu":
+        return
+
+
+def open_linkedin_browser():
+    """Open Chrome with remote debugging for LinkedIn."""
+    clear_screen()
+    print_banner()
+    rprint("\n[bold yellow]OPEN LINKEDIN BROWSER[/bold yellow]\n")
+
+    if check_chrome_remote_debugging():
+        if check_linkedin_logged_in():
+            print_success("Chrome is already open with LinkedIn logged in!")
+        else:
+            print_warning("Chrome is open but LinkedIn is not logged in.")
+            print_info("Please log into LinkedIn in the Chrome window.")
+    else:
+        print_info("Opening Chrome with remote debugging...")
+        open_chrome_with_debugging()
+        print_info("\nPlease log into LinkedIn in the Chrome window.")
+        print_info("Keep Chrome OPEN while using JobTool.")
+
+    input("\nPress Enter to continue...")
 
 
 def init_database():
@@ -346,11 +472,17 @@ def scrape_jobs_menu():
     rprint("\n[bold]Select sources:[/bold]")
     sources = []
 
-    if questionary.confirm("Scrape Reed?").ask():
+    scrape_reed = questionary.confirm("Scrape Reed? (API - always works)").ask()
+    scrape_indeed = questionary.confirm("Scrape Indeed? (Browser automation)").ask()
+    scrape_linkedin = questionary.confirm(
+        "Scrape LinkedIn? (Requires Chrome with LinkedIn open)"
+    ).ask()
+
+    if scrape_reed:
         sources.append("reed")
-    if questionary.confirm("Scrape Indeed?").ask():
+    if scrape_indeed:
         sources.append("indeed")
-    if questionary.confirm("Scrape LinkedIn?").ask():
+    if scrape_linkedin:
         sources.append("linkedin")
 
     if not sources:
@@ -368,16 +500,44 @@ def scrape_jobs_menu():
     save_state("last_query", query)
     save_state("last_location", location)
 
+    # Handle LinkedIn browser setup automatically
+    if scrape_linkedin and not check_chrome_remote_debugging():
+        print_warning("\nLinkedIn requires Chrome with remote debugging.")
+        if questionary.confirm("Open Chrome with remote debugging now?").ask():
+            open_chrome_with_debugging()
+            print_info("\nPlease log into LinkedIn in Chrome.")
+            print_info("When done, return here and press Enter.")
+            input()
+
+    # Handle Indeed browser setup
+    if scrape_indeed:
+        print_info("\nPreparing Indeed scraper...")
+
     # Scrape jobs
     clear_screen()
     print_banner()
-    rprint(f"\n[bold yellow]SCRAPING {query} in {location}[/bold yellow]\n")
+    rprint(f"\n[bold yellow]SCRAPING: {query} in {location}[/bold yellow]\n")
 
     total_new = 0
     total_dups = 0
 
     for source in sources:
         print_info(f"Scraping {source}...")
+
+        # For LinkedIn, check if Chrome is ready
+        if source == "linkedin":
+            if not check_chrome_remote_debugging():
+                print_warning(
+                    "Chrome not running with remote debugging. Skipping LinkedIn..."
+                )
+                continue
+
+            if not check_linkedin_logged_in():
+                print_warning("LinkedIn not logged in. Please log in first.")
+                print_info(
+                    "Run 'jobtool interactive' again and select 'Open LinkedIn' from Setup menu."
+                )
+                continue
 
         try:
             if source == "reed":
@@ -387,6 +547,8 @@ def scrape_jobs_menu():
                     max_jobs=max_jobs,
                     fetch_full_descriptions=True,
                 )
+                print_success(f"Reed: Found {len(jobs)} jobs")
+
             elif source == "indeed":
                 from jobtool.scrapers.indeed import scrape_indeed
 
@@ -396,6 +558,8 @@ def scrape_jobs_menu():
                     max_jobs=max_jobs,
                     fetch_descriptions=True,
                 )
+                print_success(f"Indeed: Found {len(jobs)} jobs")
+
             elif source == "linkedin":
                 from jobtool.scrapers.linkedin import scrape_linkedin
 
@@ -405,6 +569,7 @@ def scrape_jobs_menu():
                     max_jobs=max_jobs,
                     fetch_descriptions=True,
                 )
+                print_success(f"LinkedIn: Found {len(jobs)} jobs")
 
             new_count = 0
             dup_count = 0
@@ -421,8 +586,11 @@ def scrape_jobs_menu():
 
         except Exception as e:
             print_error(f"{source}: {e}")
+            import traceback
 
-    rprint(f"\n[bold green]DONE![/bold green]")
+            traceback.print_exc()
+
+    rprint(f"\n[bold green]SCRAPING COMPLETE![/bold green]")
     rprint(f"Total new jobs: {total_new}")
     rprint(f"Duplicates skipped: {total_dups}")
 
