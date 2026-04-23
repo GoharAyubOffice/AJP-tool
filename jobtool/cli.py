@@ -1220,6 +1220,24 @@ def render_test(
 
 
 # ============================================================================
+# Interactive Menu Command
+# ============================================================================
+
+
+@app.command("interactive")
+def interactive_cmd():
+    """
+    Launch the interactive menu interface.
+
+    This provides a user-friendly menu-driven interface for all
+    job application tasks without needing to remember commands.
+    """
+    from jobtool.interactive import run_interactive
+
+    run_interactive()
+
+
+# ============================================================================
 # Entry Point
 # ============================================================================
 
