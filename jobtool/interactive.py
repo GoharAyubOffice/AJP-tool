@@ -510,7 +510,7 @@ def scrape_jobs_menu():
             input()
 
     # Handle Indeed browser setup
-    if scrape_indeed:
+    if user_wants_indeed:
         print_info("\nPreparing Indeed scraper...")
 
     # Scrape jobs
