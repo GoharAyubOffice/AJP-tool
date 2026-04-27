@@ -472,17 +472,17 @@ def scrape_jobs_menu():
     rprint("\n[bold]Select sources:[/bold]")
     sources = []
 
-    scrape_reed = questionary.confirm("Scrape Reed? (API - always works)").ask()
-    scrape_indeed = questionary.confirm("Scrape Indeed? (Browser automation)").ask()
-    scrape_linkedin = questionary.confirm(
+    user_wants_reed = questionary.confirm("Scrape Reed? (API - always works)").ask()
+    user_wants_indeed = questionary.confirm("Scrape Indeed? (Browser automation)").ask()
+    user_wants_linkedin = questionary.confirm(
         "Scrape LinkedIn? (Requires Chrome with LinkedIn open)"
     ).ask()
 
-    if scrape_reed:
+    if user_wants_reed:
         sources.append("reed")
-    if scrape_indeed:
+    if user_wants_indeed:
         sources.append("indeed")
-    if scrape_linkedin:
+    if user_wants_linkedin:
         sources.append("linkedin")
 
     if not sources:
@@ -501,7 +501,7 @@ def scrape_jobs_menu():
     save_state("last_location", location)
 
     # Handle LinkedIn browser setup automatically
-    if scrape_linkedin and not check_chrome_remote_debugging():
+    if user_wants_linkedin and not check_chrome_remote_debugging():
         print_warning("\nLinkedIn requires Chrome with remote debugging.")
         if questionary.confirm("Open Chrome with remote debugging now?").ask():
             open_chrome_with_debugging()
