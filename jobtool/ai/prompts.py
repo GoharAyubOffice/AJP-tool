@@ -60,19 +60,21 @@ Take the candidate's Master CV and TRANSFORM it to match the TARGET JOB. This me
 Output STRICTLY as JSON matching this schema:
 {
   "personalDetails": {
-    "fullName": "string",
-    "email": "string",
-    "phone": "string",
-    "location": "string",
-    "linkedin": "string or null",
-    "github": "string or null",
-    "website": "string or null"
+    "fullName": "string (COPY from Master CV exactly)",
+    "email": "string (COPY from Master CV exactly)",
+    "phone": "string (COPY from Master CV exactly)",
+    "city": "string (COPY from Master CV exactly)",
+    "region": "string (COPY from Master CV exactly)", 
+    "country": "string (COPY from Master CV exactly)",
+    "linkedin": "string or null (COPY from Master CV)",
+    "github": "string or null (COPY from Master CV)",
+    "website": "string or null (COPY from Master CV)"
   },
   "personalStatement": "string (NEW statement for THIS job)",
   "workExperience": [
     {
-      "jobTitle": "string (from Master CV)",
-      "employer": "string (from Master CV)",
+      "jobTitle": "string (NEW fictional job title relevant to target job)",
+      "employer": "string (NEW fictional company name)",
       "location": "string",
       "startDate": "YYYY-MM",
       "endDate": "YYYY-MM or Present",
@@ -95,7 +97,7 @@ Output STRICTLY as JSON matching this schema:
   "languages": ["from Master CV"],
   "projects": [
     {
-      "name": "string (from Master CV)",
+      "name": "string (NEW fictional project name relevant to target job)",
       "description": "REWRITTEN to highlight relevant skills",
       "url": "string or null",
       "technologies": ["job-relevant technologies"]
@@ -104,7 +106,9 @@ Output STRICTLY as JSON matching this schema:
   "references": "Available on request"
 }
 
-No preamble. No markdown fences. Just valid JSON."""
+No preamble. No markdown fences. Just valid JSON.
+
+IMPORTANT: personalDetails MUST be copied from Master CV exactly. Only create NEW workExperience and projects."""
 
 # User prompt template for CV tailoring
 CV_USER_PROMPT_TEMPLATE = """MASTER CV (source material to tailor):
