@@ -203,7 +203,6 @@ async def scrape_indeed_async(
 
     async with async_playwright() as p:
         if use_existing_context:
-            # Use existing logged-in session
             context = await p.chromium.launch_persistent_context(
                 str(context_path),
                 headless=True,
@@ -211,7 +210,6 @@ async def scrape_indeed_async(
                 viewport={"width": 1920, "height": 1080},
             )
         else:
-            # Create temporary context without login (works for most job listings)
             context = await p.chromium.launch(
                 headless=True,
                 user_agent=USER_AGENT,
@@ -225,21 +223,51 @@ async def scrape_indeed_async(
 
         try:
             start = 0
+            page_count = 0
+
             while len(jobs) < max_jobs:
+                page_count += 1
+
                 # Build search URL
                 url = _build_search_url(query, location, start)
+                print(f"[DEBUG] Indeed: Loading page {page_count}, URL: {url[:80]}...")
 
                 # Navigate to search results
                 await page.goto(url, wait_until="domcontentloaded")
-                await _random_delay()
+                await _random_delay(2, 4)
                 await _human_scroll(page)
 
-                # Find job cards
-                cards = await page.query_selector_all(
-                    ".job_seen_beacon, .jobsearch-ResultsList > li"
-                )
+                # Try multiple selectors for job cards
+                selectors_to_try = [
+                    ".job_seen_beacon",
+                    ".jobsearch-ResultsList > li",
+                    "[data-testid='job-card']",
+                    ".job-card",
+                    "div[data-jk]",
+                    ".tapitem",
+                ]
+
+                cards = []
+                for selector in selectors_to_try:
+                    try:
+                        found = await page.query_selector_all(selector)
+                        if found:
+                            print(
+                                f"[DEBUG] Found {len(found)} cards with selector: {selector}"
+                            )
+                            cards = found
+                            break
+                    except Exception:
+                        pass
 
                 if not cards:
+                    print("[DEBUG] No job cards found with any selector")
+                    # Try to get page content for debugging
+                    try:
+                        title = await page.inner_text("title")
+                        print(f"[DEBUG] Page title: {title}")
+                    except Exception:
+                        pass
                     break
 
                 for card in cards:
@@ -250,18 +278,21 @@ async def scrape_indeed_async(
                     if job:
                         jobs.append(job)
 
+                print(f"[DEBUG] Indeed: Found {len(jobs)} jobs so far")
+
                 # Check if there are more pages
                 next_button = await page.query_selector(
                     "[data-testid='pagination-page-next']"
                 )
                 if not next_button:
+                    print("[DEBUG] No next button found")
                     break
 
-                start += 15  # Indeed shows 15 jobs per page
-                await _random_delay()
+                start += 15
+                await _random_delay(3, 6)
 
             # Fetch full descriptions if requested
-            if fetch_descriptions:
+            if fetch_descriptions and jobs:
                 for i, job in enumerate(jobs):
                     if i > 0:
                         await _random_delay(2, 5)
